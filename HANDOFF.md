@@ -1,94 +1,133 @@
 # HANDOFF: Sinapis
 
-Read this file, then `IDENTITY.md` (law), `CLAUDE.md` (permanent rules) and `DEMO.md` (the 90-second demo contract). Do not restart anything.
+Read this file, then `IDENTITY.md` (law), `CLAUDE.md` (permanent rules), `DEMO.md` (the demo contract, now 7 steps), `DELIVERY.md` (submission steps) and `SECURITY.md`. Do not restart anything.
 
 ## Goal
 
-Sinapis is an allergen graph for a restaurant kitchen: it shows which sauce and which supplier product put each allergen on each dish, and when a supplier changes a recipe it lists the affected dishes before the change is accepted. Entry for the Relate by Neo4j Hackathon (https://relate.devpost.com/), deadline 11 December 2026, 18:00 PT. Judging weighs Relate and connected context most (30), then functionality (25), usefulness (20), documentation (15), creativity (10).
+Sinapis is an allergen graph for a restaurant kitchen: it shows which sauce and which supplier product put each allergen on each dish, and when a supplier changes a recipe it lists the affected dishes before the change is accepted. Entry for the Relate by Neo4j Hackathon (https://relate.devpost.com/), deadline 11 December 2026, 18:00 PT.
 
-Phase 3 goal (this session): the whole 90-second DEMO.md path is dependable. Step 6 (guest check) runs on Relate in real mode with a mirror fallback, state persists only in the browser, every demo route has Skeleton, ErrorState and EmptyState branches, Apply cannot double-apply, no step waits over 5 seconds, and a reset returns the browser (localStorage and OPFS) to the demo start state.
+Phase 4 goal (this session): prize documentation, the path graph as DEMO step 7, a responsive and touch target audit at 360, 768 and 1280 px, site meta and empty-state copy, an orientation block on `/`, then the security pass (Part B).
 
 ## Status
 
-All six slices are written. Nothing was built, installed, tested or run by the agent (no shell).
+Part A and Part B are written. The agent built, installed, tested and ran nothing (no shell).
 
 | Slice | State | Evidence |
 | --- | --- | --- |
-| 1. Store and full reset | written | `lib/store.ts` exports `loadApplied`, `saveApplied`, `clearApplied`, `changeKey` (key `sinapis.applied.v1`); worker op `"reset"` at `lib/relate.worker.ts:178` (one queued job: wipe relationships, wipe nodes, `seedStatements`, seed marker); `resetRelate()` at `lib/relate-client.ts:163`; `resetStore()` in `lib/adapter.ts:36`, `lib/adapter.fake.ts:40`, `lib/adapter.real.ts:142`; `/?reset=1` read once on mount at `components/kitchen-provider.tsx:108`, then `history.replaceState` |
-| 2. Apply guards | written | `components/kitchen-provider.tsx:34` `const inFlight = React.useRef<{ key: string; promise: Promise<Engine> } | null>(null);`, `:57` `if (inFlight.current?.key === key) return inFlight.current.promise;`, `:63` `const repeat = !!last && changeKey(last) === key && last.note === change.note;`; `components/supplier-change-form.tsx:180` `disabled={applying}` with label `{applying ? "Writing to the graph" : "Apply to the kitchen graph"}`; preview button `disabled={previewing || applying || !change.note.trim()}` at `:137` |
-| 3. State triad | written | see the route table below |
-| 4. Guest check on Relate | written, unverified | `CYPHER.guestSafeDishes` (`lib/relate.ts:28`), `CYPHER.guestSwap` (`lib/relate.ts:41`), `rowsToGuest` (`lib/relate.ts:110`); `guestCheck` at `lib/adapter.real.ts:113` holds the `try`, the mirror return and the `[core] parity ok` / `parity mismatch n` log; `EngineNote` on the guest result at `components/dish-browser.tsx:135`; pinned swap line test in `tests/kitchen.test.ts:90`; guest proof in `scripts/proof.mjs` and README `PROOF:BEGIN guest` |
-| 5. Five-second rule | written | `lib/config.ts:49` `RELATE_TIMEOUT_MS = 2000`, `:55` `WORKER_INIT_TIMEOUT_MS = 3000`, `:58` `RELATE_BUDGET_MS = 4800`; each attempt's timeout is capped to the budget left (`once` in `lib/relate-client.ts`); pre-warm `adapter.getDishPaths(PREWARM_DISH)` at `components/kitchen-provider.tsx:117`, real mode only, single call |
-| 6. demo:reset and docs | written | `scripts/demo-reset.mjs`; `package.json` script `demo:reset`; README "Reset and persistence"; DEMO.md "What runs where" and "Reset between cycles"; CLAUDE.md names `lib/store.ts` |
+| 1. Prize table and DELIVERY.md | written | `README.md:88` header row `\| Bounty \| Prize \| Slots \| Required tech \| Code file \| DEMO step \|`, three rows below it with the Bounty and Prize cells copied from the phase brief's track record; `DELIVERY.md:5`, `:11`, `:17` headings "First place", "Second place", "Third place"; `watch:` 4, 5, 7 at `DELIVERY.md:9`, `:15`, `:21`, all present in `DEMO.md` (steps 4, 5 and 7) |
+| 2. Path graph, step 7 | written, unverified in a browser | `components/path-graph.tsx:1` `"use client"`, `:4` `import * as d3 from "d3"`, `:5` `motion/react`, `d3.scalePoint` (columns), `:127` `d3.scaleBand` (rows), `:137` `d3.linkHorizontal()`, `:277` `motion.path` with `pathLength` 0 to 1 staggered by column, `:160` `useReducedMotion()`, `:272` `role="img"`, `:267` `overflow-x-auto` wrapper, `:302` `<title>` per node, `:333` read-back sentence with `aria-live`, `:265` "No path reaches this allergen. The cell is clear."; wired at `components/dish-paths.tsx:12` (import) and `:153` (render, ready branch only, `state.paths.length > 0`); loading `:124` `DishPathsSkeleton`, error `:127` `ErrorState` with retry, empty `:158` to `:171` `PathsEmptyState`; DEMO step 7 at `DEMO.md:23` |
+| 3. Responsive audit | written | table below |
+| 4. Meta and microcopy | written | `lib/config.ts:72` `SITE_URL`; `.env.example:24` `NEXT_PUBLIC_SITE_URL=`; `app/layout.tsx:36` `metadataBase`, `:37` template `%s \| Sinapis`, `:39` `openGraph`, `:40` `twitter.card: "summary_large_image"`; description is 145 characters (counted by hand); `app/opengraph-image.tsx` claim line now starts with the title claim "Allergens traced to the supplier" |
+| 5. Orientation block | written | `app/page.tsx:13` to `:17` five links: `/#matrix` (app/page.tsx), `/dishes/grilled-sea-bass?allergen=MUS` and `/dishes/lamb-shish?allergen=PNT` (app/dishes/[id]/page.tsx, ids confirmed at `data/kitchen.json:102` and `:103`), `/activity#log-change` (app/activity/page.tsx), `/dishes` (app/dishes/page.tsx) |
+| 6. Security pass | written | `SECURITY.md` four sections plus data note; findings under "Security sweep" below |
 
-Route to file (state triad):
+### Path graph behaviour
 
-| Route | Skeleton | ErrorState (retry) | EmptyState (CTA) |
+`PathGraph({ paths, focus, kitchen })` gets the `AllergenPath[]` that `DishPaths` already fetched: no new query, no new adapter method. With a focused allergen that has paths, it draws only those paths. With a focused allergen whose matrix cell is "unknown", it draws the no-spec paths and says the cell is not cleared. With a focused allergen and no path at all, it shows the "cell is clear" line and draws every path of the dish. With no focus it draws every path. Nodes merge by `step.id`, so a shared sauce is one node. Columns come from longest-path layering, so allergens and the dashed "no spec sheet on file" node always sit in the last column, and every link runs left to right.
+
+### Responsive audit (rule 2: overflow wrapper, rule 4: truncate or break plus title, rule 5: fixed width with a max-w companion, touch: 44 px)
+
+| Route | Element | Rule | Result |
 | --- | --- | --- | --- |
-| `/` | `app/loading.tsx` `OverviewSkeleton` | `app/error.tsx` (`reset` as `onRetry`) | `MatrixEmptyState` in `components/overview-board.tsx` (empty menu or reset in progress, CTA "Log supplier change" to `/activity#log-change`) |
-| `/dishes` | `app/dishes/loading.tsx` `DishesSkeleton`, `GuestSkeleton` in `components/dish-browser.tsx` | `app/dishes/error.tsx`; guest check failure in `components/dish-browser.tsx` (retry re-runs the same check) | `GuestEmptyState` in `components/dish-browser.tsx` (CTA "Change the allergen picks") |
-| `/dishes/[id]` | `app/dishes/[id]/loading.tsx` `DishDetailSkeleton`, `DishPathsSkeleton` (Suspense fallback) | `app/dishes/[id]/error.tsx`; path query failure in `components/dish-paths.tsx` (retry re-issues the same query) | `PathsEmptyState` in `components/dish-paths.tsx` (CTA "Back to the matrix") |
-| `/activity` | `app/activity/loading.tsx` `ActivitySkeleton` | `app/activity/error.tsx`; preview and apply failures in `components/supplier-change-form.tsx` (retry re-issues the same preview or apply) | `ChangeLogEmptyState` in `components/change-log.tsx` (CTA "Log a change") |
-
-Step to code path (real path and mirror fallback in the same function):
-1. Matrix: `lib/adapter.fake.ts` `matrixOf` / `replay`, by design on the mirror in both modes, labelled by `EngineNote` with `adapter.matrixEngine`.
-2. Path click: `getDishPaths` in `lib/adapter.real.ts`.
-3. Form: `components/supplier-change-form.tsx` (calls the adapter only).
-4. Preview and Apply: `previewImpact` and `applyChange` in `lib/adapter.real.ts`.
-5. Cells turn red: `apply` in `components/kitchen-provider.tsx` (replay on the mirror, write through `applyChange`).
-6. Guest check: `guestCheck` in `lib/adapter.real.ts`.
+| `/dishes/[id]` | path graph SVG | 2, 5 | fine: `path-graph.tsx:267` `max-w-full overflow-x-auto`, inner min width `max(36rem, columns x 10rem)`, svg `h-auto w-full max-w-full` |
+| `/dishes/[id]` | node labels | 4 | fine: clipped in code to 21 characters with a `<title>` carrying the full label and supplier |
+| `/dishes/[id]` | path step chips in the group cards | 4 | fixed: `dish-paths.tsx` chip has `max-w-full break-words` and `title={s.label}` |
+| `/dishes/[id]` | "All dishes" back button (`Button size="sm"`) | touch | fixed: `button.tsx:23` `max-md:min-h-11` |
+| `/dishes/[id]`, `/` | `PathsEmptyState` and `MatrixEmptyState` buttons (`sm`) | touch | fixed by `button.tsx:23` |
+| `/dishes/[id]` | path query retry (`ErrorState`, default size) | touch | fixed: `button.tsx:22` `max-md:min-h-11` |
+| `/activity` | product select with long product names | 4, 5 | fixed: grid `grid-cols-1` below md, labels `min-w-0`, select `max-w-full truncate` with `title={product?.name}` (`supplier-change-form.tsx`) |
+| `/activity` | supplier name, preview dish names, "via" path line | 4 | fixed: `min-w-0 break-words`, dish name has `title` |
+| `/activity` | selects and note input | touch | fixed: `select.tsx:9` and `input.tsx:10` `max-md:min-h-11` |
+| `/activity` | Preview, Apply, Discard, retry buttons (default size) | touch | fixed by `button.tsx:22` |
+| `/activity` | change log dish badge links | touch, 4 | fixed: `change-log.tsx:57` `inline-flex min-h-11 max-w-full items-center` plus `title`; card title and description `break-words` |
+| `/dishes` | guest allergen toggles (`sm`) | touch | fixed by `button.tsx:23` |
+| `/dishes` | section filter buttons (`sm` with `h-10`) | touch | fixed by `button.tsx:23` (min-height wins over `h-10`) |
+| `/dishes` | search input | touch | fixed by `input.tsx:10` |
+| `/dishes` | dish row name and note | 4 | fixed: `min-w-0 break-words`, `title={dish.name}`, price and badge `shrink-0`; the row link itself is `p-4` (well over 44 px) |
+| `/dishes`, `/dishes/[id]` | guest check and path retries | touch | fixed by `button.tsx:22` |
+| `/` | allergen matrix table | 2, 5 | fine: `allergen-matrix.tsx:34` `max-w-full overflow-x-auto`; table min width raised to `min-w-[56rem]` (`:35`) to fit 44 px cells |
+| `/` | matrix cell links | touch | fixed: `allergen-matrix.tsx:82` `min-h-11 min-w-11` (was `h-8`) |
+| `/` | matrix column header buttons | touch | fixed: `allergen-matrix.tsx:52` `h-11 min-h-11 min-w-11` (was `h-7`) |
+| `/` | matrix dish name links | touch, 4 | fixed: `allergen-matrix.tsx:67` `inline-flex min-h-11 break-words` plus `title` |
+| `/` | allergen load chart | 2 | fine: `allergen-load-chart.tsx:52` `overflow-x-auto`, svg `min-w-[30rem]` inside it |
+| `/` | "Show all allergens", "Reset to seed", "Open change log" (`sm`) | touch | fixed by `button.tsx:23` |
+| `/` | orientation links | touch | fine: `app/page.tsx:67` `inline-flex min-h-11` |
+| `/` | scene image | 5 | fine: `scene-slot.tsx` `h-auto w-full max-w-full` |
+| all | rail section links | touch | fixed: `app-rail.tsx:39` `min-h-11` (mobile was 56 px already; desktop row was 40 px) |
+| all | rail CTA "Log supplier change" (`sm`) | touch | fixed: `app-rail.tsx:50` `min-h-11` |
+| all | bottom bar | nav | fine: Overview, Dishes, Change log all in `SECTIONS` at `app-rail.tsx:10` to `:14`, `md:` variants kept; added `pb-[env(safe-area-inset-bottom)]` (`:31`); `main` has `pb-28` (`layout.tsx:50`), which clears the bar of about 60 px |
+| all | sticky top bar plus fixed bottom bar at 360 px | nav | fine by reading: top bar is mark plus CTA in one row (`py-3`), bottom bar one row; content scrolls between them |
+| all | error and not-found | shell | fine: rendered inside `app/layout.tsx`, so the rail stays; links to `/` added in `app/error.tsx:16` (`/?reset=1`), `app/dishes/error.tsx:14`, `app/dishes/[id]/error.tsx:14`, `app/activity/error.tsx:14`; `app/not-found.tsx` already links to `/` |
 
 ## Decisions
 
-- Persistence. Table row used: "one small mutable state", realised as browser storage: the applied change list in `localStorage` (only through `lib/store.ts`) plus the Relate OPFS store `opfs://sinapis-kitchen` in real mode. Rejected: Upstash KV (no step needs state shared across visitors, and a shared store would let one visitor's Apply change another visitor's demo), Postgres (no relational read), on-chain (no chain). There is no server write, so there is no runtime filesystem write and no migration or schema push.
-- Idempotency lives at the client write boundary, `apply` in `components/kitchen-provider.tsx`, because there is no server write route. A repeat call with the same `changeKey` while one is pending returns the pending promise; a change equal to the last applied one (same key and note) writes to the engine again but adds no log entry and no `saveApplied`. `applyChange` in `lib/adapter.real.ts` clears before it adds, so a replay is also harmless on the Relate side. The form also keeps an `applyingRef` so two clicks in one frame write once.
-- Timeouts (constants in `lib/config.ts`, no env var): worker init 3 s (sticky failure for the session), one attempt 2 s, exactly one retry, whole call capped at 4.8 s. A dead worker falls back to the mirror inside 5 s.
-- Reset order: clear React state, `clearApplied()`, then `await adapter.resetStore()`. While the reset runs the overview shows `MatrixEmptyState` in its resetting form. This closes the Phase 2 open question that reset left OPFS stale.
-- Relate API corrected from the installed package (read from `node_modules/@relate/relate-wasm/relate.d.ts` and its README, version 1.2.0): default export `init()`, `RelateDb.open(uri)`, `db.execute(query, paramsJson)` returning a JSON envelope `{ columns, rows, stats, error }` that reports engine errors in `error`. The Phase 2 worker never called `init()` when `RelateDb` was exported and passed params as an object, so real mode could not have worked; the Phase 2 proof line in README (`__wbindgen_malloc` of undefined) is that failure. `callDb` in `lib/relate.worker.ts` now stringifies params, parses the envelope and maps `error` to `upstream_error`; a throw from `execute` is treated as a wasm trap and makes every later call answer `not_configured` (no retry, mirror fallback). `scripts/proof.mjs` now uses `initSync` with the wasm bytes and `new RelateDb()` in Node.
-- Swap in Cypher: the substitution list lives in `data/kitchen.json`, not in the graph, so `CYPHER.guestSwap` takes it as the `$swaps` parameter (a list of `{from, to}` maps). Which swap a dish shows is picked in `rowsToGuest` in kitchen order, the same order the mirror uses.
-- The guest queries match nodes by their `id` property, not `elementId()`, because ids in the app are the seed ids. No APOC.
-- `/dishes/[id]` reads `?allergen=` in the client component `DishPathsFromQuery` under `Suspense`, so the 16 pages can prerender (Phase 2 open question 4).
-- No visual rule changed, so no IDENTITY.md amendment. `.env.example` and `.farm-live.json` are unchanged: no new secret and no new env key.
-- Ask-first items: no new dependency, no new route, no new env variable (defaults taken).
+- No `targetTracks` entry is `sponsor-bounty`. The repo holds no track file (no `targetTracks` string anywhere). The record in the phase brief lists three `main-placement` tracks with `entryMode: automatic`, so no bounty was dropped and nothing was skipped. No sponsor key was added and `.farm-live.json` is unchanged.
+- Relate in an import and at a call site: `lib/relate.worker.ts:52` `await import("@relate/relate-wasm")` (a dynamic import, so the module loads only inside the worker), `:71` `mod.RelateDb!.open(RELATE_STORE_URI)`, `:111` `db.execute(cypher, ...)`.
+- Path graph rows: `d3.scaleBand` spaces the rows, and each column centres its nodes on that band grid instead of giving every path its own row. Merged nodes would otherwise sit between rows, and a single chain (the wow case) stays on one straight line.
+- Path graph columns: longest-path layering instead of the raw step index, because paths of different depth (dish to ingredient against dish to sauce to ingredient) would put allergens in different columns and send merged links backwards.
+- The graph's links start at `pathLength` 0. That is not a server HTML issue: the paths are fetched on the client, so the graph never appears in server HTML. Under reduced motion `initial={false}` draws the final state at once.
+- `DishPaths` used to say "This cell is clear" for a focused cell whose matrix state is "unknown" (a `?` cell). That broke the rule that unknown is never free. It now shows a "not cleared" empty state for that case (`dish-paths.tsx:158` to `:171`).
+- Touch targets below md come from the `Button` variants (`max-md:min-h-11`) rather than per call site, so every demo-path button is covered once. Desktop heights are unchanged.
+- Title claim "Allergens traced to the supplier" (five words). The OG image claim line was changed to start with the same words, because the old line disagreed with the new title.
+- IDENTITY amendment added: kit signature 2 (hover read-back) now exists on the dish route.
 
 ## Failed attempts
 
 None. No correction was attempted twice, because nothing could be run.
 
-## Files changed
+## Security sweep (Part B)
 
-Created: `lib/store.ts`, `components/route-states.tsx`, `app/dishes/error.tsx`, `app/dishes/[id]/error.tsx`, `app/activity/error.tsx`, `scripts/demo-reset.mjs`, `.farm-commits.json`.
+- Contract front skipped: no contracts/ directory, Relate is an embedded database.
+- Wallet front: grep over `app/`, `components/`, `lib/` for `eth_requestAccounts|eth_sign|personal_sign|ethereum|wallet_|connect\(|approve` returned no matches.
+- Key-like strings: grep over `app/`, `components/`, `lib/` for `sk-|PRIVATE_KEY|API_KEY|SECRET|[0-9a-fA-F]{64}|[A-Za-z0-9+/]{80,}={0,2}` returned no matches.
+- Public env keys: `process.env` is read only in `lib/config.ts` (`ADAPTER_MODE`, `NEXT_PUBLIC_ADAPTER_MODE`, `NEXT_PUBLIC_RELATE_WASM_URL`, `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_BRAND_FILES`) and in `next.config.ts:20` (`ADAPTER_MODE`). All five keys are listed in `.env.example`, and none is a secret.
+- `target="_blank"`: grep returned no matches, so no `rel` is missing. No new external link was added.
+- `http://` in app code: one hit, `app/icon.svg:1`, the `xmlns="http://www.w3.org/2000/svg"` namespace. That is an XML identifier, not a request, and the file is on the never-touch list. Nothing else.
+- Hardcoded URLs: `lib/relate.worker.ts` loads either the bundled package or `NEXT_PUBLIC_RELATE_WASM_URL` (`:50` to `:52`), with no literal URL. `next.config.ts` has none. The only literal URL in `lib/` is the https default for `SITE_URL` (`lib/config.ts:72`).
+- Forms: `supplier-change-form.tsx` calls only `adapter.previewImpact` and the provider's `apply` (which writes through the adapter). The guest check in `dish-browser.tsx` calls only `adapter.guestCheck`. Grep for `fetch\(|XMLHttpRequest|sendBeacon|WebSocket` over `app/`, `components/`, `lib/` returned no matches, so nothing sends data to a third party or to a server.
+- API routes: `app/api/dishes/[id]/paths/route.ts:10` `dishIdSchema.safeParse`, `app/api/guest/route.ts:15` `guestSchema.safeParse`, `app/api/impact/route.ts:15` `specChangeSchema.safeParse`, all from `lib/schemas.ts`. `app/api/dishes/route.ts` and `app/api/matrix/route.ts` take no input.
+- Found but not fixed: nothing. Everything above is clean.
+- Part B added no route, no dependency and no feature module. The only files it touched are `SECURITY.md` and this file.
 
-Edited: `components/kitchen-provider.tsx`, `lib/relate.worker.ts`, `lib/relate-client.ts`, `lib/adapter.ts`, `lib/adapter.fake.ts`, `lib/adapter.real.ts`, `lib/relate.ts`, `lib/config.ts`, `lib/kitchen-graph.ts`, `types/relate-wasm.d.ts`, `components/supplier-change-form.tsx`, `components/overview-board.tsx`, `components/change-log.tsx`, `components/dish-paths.tsx`, `components/dish-browser.tsx`, `components/brand-mark.tsx`, `components/scene-slot.tsx`, `app/error.tsx`, `app/loading.tsx`, `app/dishes/loading.tsx`, `app/dishes/[id]/loading.tsx`, `app/activity/loading.tsx`, `app/dishes/[id]/page.tsx`, `tests/kitchen.test.ts`, `scripts/proof.mjs`, `package.json`, `README.md`, `DEMO.md`, `CLAUDE.md`, `HANDOFF.md`.
+### Note for the builder's demo video
 
-Untouched: `data/kitchen.json`, `public/*`, `app/icon.svg`, `package-lock.json`, `IDENTITY.md`, `.farm-live.json`, `.env.example`, `kitchen/`.
-
-## Commands run
-
-None, agent has no shell. Unverified until the runner reports: `npm install`, `npm run build`, `npm test` (including the pinned guest expectation and `changeKey`), `npm run proof` (including the new guest block), `npm run seed`, `npm run demo:reset`, and the live three-cycle walk in a browser with OPFS.
+There is no wallet, so Blockaid is not expected to flag the site. The video should show steps 1 to 7 on the live URL.
 
 ## Acceptance self-check (read from files, not run)
 
-- Met by reading: every item in the Status table; `localStorage` appears in code only in `lib/store.ts`; no `fs` import in `app/`, `components/` or `lib/`; images use `next/image` (`components/brand-mark.tsx`, `components/scene-slot.tsx`), no raw `<img>`; each demo route fetches in one effect at most (`DishPaths`, `DishBrowser`), with no effect that sets state feeding a second fetch effect; sameness, dash and vocabulary greps over `app/`, `components/`, `lib/`, README, DEMO, HANDOFF return nothing; the only `@keyframes` is `sinapis-rise` (`app/globals.css:124`); `BrandMark` renders once, `components/app-rail.tsx:25`.
-- Unverified: whether Relate's Cypher accepts the constructs in `guestSafeDishes` and `guestSwap` (OPTIONAL MATCH after a variable-length match, `collect` and `sum(CASE ...)` aggregates, `any(... IN $codes)`, `UNWIND` over a list of maps with `s.from`, an unlabelled `(t {id: s.to})` match, `[:USES*0..6]`). If a query is rejected, `guestCheck` falls back to the mirror and logs `[core] fallback upstream_error step=guest`; `npm run proof` will show the engine error text in the guest block.
-- Unverified: the wipe statements `MATCH ()-[r]->() DELETE r` and `MATCH (n) DELETE n` on Relate; whether `init()` finds `relate_bg.wasm` after Next bundles the worker (`new URL('relate_bg.wasm', import.meta.url)` inside `relate.js`); whether the first OPFS open plus a 187 statement seed fits the 3 s init budget on a cold visit.
+- Met by reading: every row of the Status table; `components/app-rail.tsx` keeps the `md:` variants and all three sections; `BrandMark` renders once (`components/app-rail.tsx:25`); `app/icon.svg` untouched; `app/opengraph-image.tsx` uses `BRAND` only; `useSearchParams` appears only in `components/dish-paths.tsx:51`, rendered under `Suspense` at `app/dishes/[id]/page.tsx:50`, and `app/dishes/page.tsx` does not use it; no `fs` write in `app/`, `components/`, `lib/`; no `console` call in `components/` or `app/` (the `[core]` lines in `lib/` are `console.info` or `console.warn` and short); no new `package.json` entry.
+- Tripwire greps over `app/`, `components/`, `lib/`, README.md, DEMO.md, DELIVERY.md returned nothing for: the dead hexes, `fade-up|float-y|glow-pulse|caret-blink|pulse-dot|backdrop-blur|--delay|--d:`, the em dash, the en dash and ` -- `, and the banned vocabulary. Hex literals appear only in `app/globals.css` and `lib/brand-colors.ts`. The only `@keyframes` is `sinapis-rise` (`app/globals.css:124`).
+- Unverified (needs the runner): that the build is green (especially the `d3.linkHorizontal()` and `motion.path` typings in `path-graph.tsx`); the graph's look at 360, 768 and 1280 px; that the lamb shish read-back sentence matches DEMO step 7 on the live URL; Lighthouse scores; `og:image` as an absolute URL in view-source.
+
+## Not done
+
+Nothing in Part A or Part B was cut.
+
+## Files changed
+
+Created: `DELIVERY.md`, `SECURITY.md`, `components/path-graph.tsx`, `.farm-commits.json`.
+
+Edited: `README.md`, `DEMO.md`, `HANDOFF.md`, `IDENTITY.md` (Amendments only), `components/dish-paths.tsx`, `components/app-rail.tsx`, `components/allergen-matrix.tsx`, `components/change-log.tsx`, `components/supplier-change-form.tsx`, `components/dish-browser.tsx`, `components/overview-board.tsx`, `components/ui/button.tsx`, `components/ui/select.tsx`, `components/ui/input.tsx`, `app/error.tsx`, `app/dishes/error.tsx`, `app/dishes/[id]/error.tsx`, `app/activity/error.tsx`, `app/layout.tsx`, `app/opengraph-image.tsx`, `app/page.tsx`, `lib/config.ts`, `.env.example`.
+
+Untouched: `data/kitchen.json`, `public/*`, `app/icon.svg`, `package.json`, `package-lock.json`, `.farm-live.json`, `kitchen/`, `app/globals.css`.
+
+## Commands run
+
+None, no shell. The runner must verify: `npm install`, `npm run build` (zero TypeScript errors), `npm test` (no test removed), `npm run proof`, the Vercel redeploy to the same project, the three-cycle walk of DEMO steps 1 to 7 on the live URL with `ADAPTER_MODE=real` in a private window, 360/768/1280 px with no page-level horizontal scroll, `og:image` absolute https and `twitter:card` `summary_large_image` in view-source, Lighthouse performance and accessibility at 80 or above.
 
 ## Open questions
 
-- Cold first visit: if the wasm download plus the first seed exceed `WORKER_INIT_TIMEOUT_MS` (3 s), the session sticks to the mirror (labelled). If the runner sees `relate open failed upstream_timeout` on a normal connection, seed with one `db.executeScript(...)` call instead of 187 `execute` calls, or let the init keep running in the background and only the first answer fall back.
-- A reset whose worker job outlives the 2 s attempt times out on the client and logs a fallback, but the queued job still completes in the worker; a retry queues a second reseed, which is harmless. Confirm the duration on the live URL.
-- `RelateDb.reset()` exists in the package typings but is undocumented; the reset uses explicit wipe statements instead.
+- The path graph's `<g tabIndex={0}>` nodes sit inside an `svg role="img"`, so screen readers treat the graph as one image (the full path list is in its label and in an `sr-only` caption), while keyboard users still tab through nodes and hear the sentence through `aria-live`. If an accessibility audit flags focusable children inside `role="img"`, switch the svg to `role="group"` with the same label.
+- Carried from Phase 3: whether Relate accepts every guest-check construct, and whether a cold OPFS seed fits the 3 s init budget.
 
 ## Manual checklist (human facts)
 
 - [ ] Add the GitHub topics `relate` and `relate-neo4j-hackathon` to the repository.
 - [ ] Run `npm run seed` or `npm run demo:reset` with the `relate` CLI on PATH and commit `kitchen/seed.cypher` and `kitchen/store`.
-- [ ] With `ADAPTER_MODE=real`, in a private window: open `/?reset=1`, walk DEMO.md steps 1 to 6 three times, identical results, no step over 5 s; Reset to seed clears the OPFS copy; with the worker blocked, every step ends on the mirror inside 5 s.
+- [ ] With `ADAPTER_MODE=real`, in a private window: open `/?reset=1`, walk DEMO.md steps 1 to 7 three times, identical results, no step over 5 s, no console errors.
+- [ ] Work through `DELIVERY.md` "Before submitting".
+- [ ] Record the 2 minute video.
 
 ## Next best step
 
-The path graph panel on `/dishes/[id]` (d3 layout rendered in React, no new dependency), then kit signatures 2 and 3, then Phase 4 polish (README query output from a real run, video under 2 minutes following DEMO.md).
-
-### Constraints (unchanged)
-
-Next.js 15 App Router, TypeScript strict, Tailwind v4, no API keys, no runtime filesystem writes. IDENTITY.md colors only through `app/globals.css`. All UI through `components/ui/` and `cn()`. Plain English copy with no em or en dashes and none of the cliche words banned in CLAUDE.md. A product without a spec sheet is "unknown", never "free". `npm run build` must pass after every change.
+Phase 5, the frontend pass: kit signature 3 (an animated switch between two views of the same data, for example the load chart per allergen and cumulative), then visual polish on the graph node sizes after the runner's screenshots at 360 px.
