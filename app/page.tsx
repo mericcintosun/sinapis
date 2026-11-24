@@ -1,34 +1,42 @@
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { seed } from "@/lib/data";
+import { OverviewBoard } from "@/components/overview-board";
+import { SceneSlot } from "@/components/scene-slot";
+import { seedKitchen } from "@/lib/data";
 
-// TEMPLATE: this page must be rewritten with the idea's real copy at scaffold
-// time: hero with the product one-liner and ONE primary CTA, 2-3 product
-// sections, footer. Use the shadcn primitives in components/ui; never bare
-// unstyled HTML controls. No template copy may survive.
-export default function Home() {
+// Overview: the app shell's welcome state, built from the seed. No marketing hero;
+// the rail holds the only call to action (Log supplier change).
+export default function OverviewPage() {
+  const k = seedKitchen;
+  const unknownSpecs = k.products.filter((p) => !p.specKnown);
+
   return (
-    <div className="space-y-16 py-10">
-      <section className="mx-auto max-w-2xl space-y-6 text-center">
-        <Badge variant="outline">TEMPLATE</Badge>
-        <h1 className="text-4xl font-bold tracking-tight">Template</h1>
-        <p className="text-lg text-muted-foreground">
-          Warm-start scaffold. If you can read this in a shipped product, the scaffold step failed.
-        </p>
-        <Button size="lg">Primary CTA</Button>
+    <div className="mx-auto max-w-6xl space-y-8">
+      <section className="sinapis-rise-group grid items-center gap-6 lg:grid-cols-[1.3fr_1fr]">
+        <div className="sinapis-rise space-y-4">
+          <p className="text-sm font-semibold uppercase tracking-wide text-ink/75">
+            {k.restaurant.name}, {k.restaurant.city}
+          </p>
+          <h1 className="text-4xl leading-tight text-ink md:text-5xl">
+            Every allergen on your menu, traced back to the jar it came from.
+          </h1>
+          <p className="max-w-[66ch] text-lg leading-relaxed text-ink/90">
+            Chef {k.restaurant.chef} runs {k.dishes.length} dishes through {k.subRecipes.length} sub-recipes and{" "}
+            {k.products.length} supplier products from {k.suppliers.length} suppliers. Sinapis keeps them as one graph,
+            so a mustard flag on the sea bass comes with the sauce and the mayonnaise that put it there. Right now{" "}
+            {unknownSpecs.length} product ({unknownSpecs.map((p) => p.name).join(", ")}) has no spec sheet, and every
+            dish that touches it stays flagged until one arrives.
+          </p>
+        </div>
+        <div className="sinapis-rise overflow-hidden rounded-md">
+          <SceneSlot
+            n={1}
+            alt="A chef at a steel pass reading a supplier's spec sheet next to a menu card with dishes ticked in red"
+            width={960}
+            height={640}
+          />
+        </div>
       </section>
-      <section className="grid gap-4 sm:grid-cols-2">
-        {seed.map((s) => (
-          <Card key={s.id}>
-            <CardHeader>
-              <CardTitle>{s.name}</CardTitle>
-              <CardDescription>Replace with a real feature card.</CardDescription>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">Seed-driven content.</CardContent>
-          </Card>
-        ))}
-      </section>
+
+      <OverviewBoard />
     </div>
   );
 }
