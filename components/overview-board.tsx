@@ -4,7 +4,8 @@ import * as React from "react";
 import Link from "next/link";
 import type { AllergenCode } from "@/lib/data";
 import { allergenLoad } from "@/lib/kitchen-graph";
-import { useKitchen } from "@/components/kitchen-provider";
+import { useKitchen, useKitchenAdapter } from "@/components/kitchen-provider";
+import { EngineNote } from "@/components/engine-note";
 import { AllergenLoadChart } from "@/components/allergen-load-chart";
 import { AllergenMatrix } from "@/components/allergen-matrix";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +16,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 // or a column header narrows both to the same question.
 export function OverviewBoard() {
   const { kitchen, matrix, fresh, log, reset } = useKitchen();
+  const adapter = useKitchenAdapter();
   const [focus, setFocus] = React.useState<AllergenCode | null>(null);
   const rows = React.useMemo(() => allergenLoad(kitchen, matrix), [kitchen, matrix]);
   const latest = log[0];
@@ -72,6 +74,7 @@ export function OverviewBoard() {
             {kitchen.dishes.length} dishes by the 14 EU allergens. C contains, M may contain, ? means a supplier never
             sent a spec sheet, so the dish is not cleared. Click any cell to see the path behind it.
           </CardDescription>
+          <EngineNote engine={adapter.matrixEngine} mode={adapter.mode} className="pt-1" />
         </CardHeader>
         <CardContent>
           <AllergenMatrix

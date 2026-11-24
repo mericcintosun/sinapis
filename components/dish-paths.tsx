@@ -5,6 +5,7 @@ import { ChevronRight } from "lucide-react";
 import type { AllergenCode } from "@/lib/data";
 import type { AllergenPath, Engine } from "@/lib/types";
 import { useKitchen, useKitchenAdapter } from "@/components/kitchen-provider";
+import { EngineNote } from "@/components/engine-note";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -97,10 +98,12 @@ export function DishPaths({ dishId, focus }: { dishId: string; focus: AllergenCo
 
       {state.kind === "ready" && (
         <>
-          <p className="text-sm text-ink/80">
-            {state.paths.length} paths answered by{" "}
-            {state.engine === "relate-wasm" ? "Relate (WASM, OPFS store)" : "the local graph mirror (Relate WASM not configured)"}.
-          </p>
+          <div className="space-y-1 text-ink/85">
+            <p className="text-sm">
+              {state.paths.length} {state.paths.length === 1 ? "path" : "paths"} from this dish.
+            </p>
+            <EngineNote engine={state.engine} mode={adapter.mode} />
+          </div>
           {groups.length === 0 && (
             <Card>
               <CardContent className="p-5">No path reaches a declared allergen or an unknown spec. Nothing to flag.</CardContent>

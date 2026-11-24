@@ -6,6 +6,7 @@ import { ChevronRight } from "lucide-react";
 import type { AllergenCode } from "@/lib/data";
 import type { Engine, ImpactRow, SpecChange } from "@/lib/types";
 import { useKitchen, useKitchenAdapter } from "@/components/kitchen-provider";
+import { EngineNote } from "@/components/engine-note";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -145,23 +146,24 @@ export function SupplierChangeForm() {
                     Discard
                   </Button>
                 </div>
-                <p className="text-xs text-kiln/60">
-                  Preview answered by {phase.engine === "relate-wasm" ? "Relate WASM" : "the local graph mirror"}.
-                </p>
               </>
             )}
+            <EngineNote engine={phase.engine} mode={adapter.mode} className="text-kiln/75" />
           </div>
         )}
 
         {phase.kind === "applied" && (
-          <div className="sinapis-rise flex flex-wrap items-center justify-between gap-3 rounded-md bg-ok p-4 text-sm">
-            <span>
-              Written to {phase.engine === "relate-wasm" ? "Relate" : "the local graph"}. {phase.count} dishes re-flagged
-              on the matrix.
-            </span>
-            <Button asChild size="sm">
-              <Link href="/">See the matrix</Link>
-            </Button>
+          <div className="sinapis-rise space-y-3 rounded-md bg-ok p-4 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span>
+                Written to {phase.engine === "relate-wasm" ? "Relate" : "the local graph mirror"}. {phase.count}{" "}
+                {phase.count === 1 ? "dish" : "dishes"} re-flagged on the matrix.
+              </span>
+              <Button asChild size="sm">
+                <Link href="/">See the matrix</Link>
+              </Button>
+            </div>
+            <EngineNote engine={phase.engine} mode={adapter.mode} />
           </div>
         )}
       </CardContent>
