@@ -38,8 +38,11 @@ function readBrandFiles(): string {
   }
 }
 
-/** fake (default) answers from the local mirror; real asks Relate WASM in the browser. */
-export const ADAPTER_MODE: AdapterMode = readAdapterMode() === "real" ? "real" : "fake";
+/**
+ * real (default) asks Relate WASM in the browser and falls back to the local mirror only when
+ * the worker cannot load or answer; fake answers from the mirror only (tests, offline work).
+ */
+export const ADAPTER_MODE: AdapterMode = readAdapterMode() === "fake" ? "fake" : "real";
 
 /** Optional override: load @relate/relate-wasm from this URL instead of the bundled package. */
 export const RELATE_WASM_URL: string | undefined = readWasmUrl();
@@ -48,7 +51,7 @@ export const RELATE_WASM_URL: string | undefined = readWasmUrl();
 export const RELATE_STORE_URI = "opfs://sinapis-kitchen";
 
 // Five-second rule: no demo step may wait longer than 5 s, even when the worker fails.
-// Worst cases: a dead worker falls back after WORKER_INIT_TIMEOUT_MS (3 s); a warm worker
+// Worst cases: a dead or still-loading worker falls back after WORKER_INIT_TIMEOUT_MS (3 s); a warm worker
 // that stops answering falls back after two attempts of RELATE_TIMEOUT_MS (4 s); a cold
 // worker plus a slow query is cut by RELATE_BUDGET_MS: each attempt's timeout is capped to
 // what is left of the budget, and the retry is skipped when it would end past it.
@@ -59,8 +62,18 @@ export const RELATE_TIMEOUT_MS = 2000;
 /** Exactly one retry after a failed or timed out call. */
 export const RELATE_RETRIES = 1;
 
-/** Budget for loading the WASM module, opening OPFS and seeding an empty store. */
+/**
+ * How long one demo step waits for the worker to finish opening before that step is
+ * answered by the mirror. The open itself keeps running, so the next step can use Relate.
+ */
 export const WORKER_INIT_TIMEOUT_MS = 3000;
+
+/**
+ * How long the worker may take to open at all (7 MB WASM download on a cold connection,
+ * compile, OPFS open, first seed). Only past this, or on a real failure, is Relate turned
+ * off for the session.
+ */
+export const WORKER_OPEN_MAX_MS = 30000;
 
 /** Total budget for one call (init wait, first attempt and retry together). */
 export const RELATE_BUDGET_MS = 4800;

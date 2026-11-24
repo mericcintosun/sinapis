@@ -17,7 +17,7 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_BRAND_FILES: brandFiles.join(","),
     // The client bundle sees the same adapter mode as the server (see lib/adapter.ts).
-    NEXT_PUBLIC_ADAPTER_MODE: process.env.ADAPTER_MODE ?? "fake",
+    NEXT_PUBLIC_ADAPTER_MODE: process.env.ADAPTER_MODE || "real",
   },
 };
 
