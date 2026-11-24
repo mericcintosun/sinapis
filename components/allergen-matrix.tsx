@@ -10,7 +10,7 @@ const CELL: Record<CellStatus, { glyph: string; cls: string; word: string }> = {
   contains: { glyph: "C", cls: "bg-bad text-kiln", word: "contains" },
   may: { glyph: "M", cls: "bg-warn text-kiln", word: "may contain" },
   unknown: { glyph: "?", cls: "border border-dashed border-kiln/70 text-kiln", word: "unknown spec, treated as a risk for" },
-  free: { glyph: "", cls: "text-kiln/30 hover:bg-kiln/5", word: "has no declared" },
+  free: { glyph: "", cls: "bg-kiln/5 text-kiln/40 hover:bg-kiln/10", word: "has no declared" },
 };
 
 // Dishes x 14 allergens. Every flagged cell links to the dish page, where the
@@ -31,14 +31,19 @@ export function AllergenMatrix({
   onFocus: (code: AllergenCode | null) => void;
 }) {
   return (
+    <>
+    <p className="px-1 pb-2 text-xs text-kiln/70 md:hidden">Swipe sideways for all 14 allergen columns. The dish names stay put.</p>
     <div className="max-w-full overflow-x-auto">
-      <table className="w-full min-w-[56rem] border-separate border-spacing-1 text-sm">
+      <table className="w-full min-w-[46rem] border-separate border-spacing-1 text-sm sm:min-w-[56rem]">
         <caption className="sr-only">
           Allergen matrix: C means contains, M means may contain, a question mark means the supplier spec is unknown.
         </caption>
         <thead>
           <tr>
-            <th scope="col" className="w-56 text-left text-xs font-semibold uppercase tracking-wide text-kiln/60">
+            <th
+              scope="col"
+              className="sticky left-0 z-10 w-36 bg-card pr-2 text-left text-xs font-semibold uppercase tracking-wide text-kiln/70 sm:w-56"
+            >
               Dish
             </th>
             {allergens.map((a) => (
@@ -60,7 +65,7 @@ export function AllergenMatrix({
         <tbody>
           {dishes.map((d) => (
             <tr key={d.id}>
-              <th scope="row" className="pr-2 text-left font-medium">
+              <th scope="row" className="sticky left-0 z-10 bg-card pr-2 text-left text-xs font-medium sm:text-sm">
                 <Link
                   href={`/dishes/${d.id}`}
                   title={d.name}
@@ -95,5 +100,6 @@ export function AllergenMatrix({
         </tbody>
       </table>
     </div>
+    </>
   );
 }
