@@ -7,6 +7,7 @@ import type { AllergenCode } from "@/lib/data";
 import type { Engine, ImpactRow, SpecChange } from "@/lib/types";
 import { useKitchen, useKitchenAdapter } from "@/components/kitchen-provider";
 import { EngineNote } from "@/components/engine-note";
+import { ErrorState } from "@/components/route-states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,10 +16,10 @@ import { Select } from "@/components/ui/select";
 
 type Phase =
   | { kind: "editing" }
-  | { kind: "previewing" }
   | { kind: "preview"; engine: Engine; rows: ImpactRow[] }
   | { kind: "applied"; engine: Engine; count: number }
-  | { kind: "error"; message: string };
+  /** `retry` re-issues exactly the call that failed: the preview, or the apply of these rows. */
+  | { kind: "error"; message: string; retry: { op: "preview" } | { op: "apply"; rows: ImpactRow[]; engine: Engine } };
 
 const STATUS_WORD = { contains: "contains", may: "may contain", unknown: "unknown", free: "clear" } as const;
 
@@ -34,28 +35,55 @@ export function SupplierChangeForm() {
     note: "Antep Tahin Evi, 24 Nov: tahini is now roasted on a line shared with peanuts.",
   });
   const [phase, setPhase] = React.useState<Phase>({ kind: "editing" });
+  // Pending flags bound to the buttons: set before the await, cleared in finally.
+  const [previewing, setPreviewing] = React.useState(false);
+  const [applying, setApplying] = React.useState(false);
+  // Same guard as a ref, so two clicks in one frame (before the re-render) still write once.
+  const applyingRef = React.useRef(false);
+  const busy = previewing || applying;
   const set = (patch: Partial<SpecChange>) => {
+    if (busy) return;
     setChange((c) => ({ ...c, ...patch }));
     setPhase({ kind: "editing" });
   };
 
   const preview = async () => {
-    setPhase({ kind: "previewing" });
+    if (previewing || applying) return;
+    setPreviewing(true);
     try {
       const r = await adapter.previewImpact(change, kitchen);
       setPhase({ kind: "preview", engine: r.engine, rows: r.data });
     } catch (e) {
-      setPhase({ kind: "error", message: e instanceof Error ? e.message : "Preview failed" });
+      setPhase({ kind: "error", message: e instanceof Error ? e.message : "Preview failed", retry: { op: "preview" } });
+    } finally {
+      setPreviewing(false);
     }
   };
 
-  const commit = async (rows: ImpactRow[]) => {
+  const commit = async (rows: ImpactRow[], previewEngine: Engine) => {
+    if (applyingRef.current) return;
+    applyingRef.current = true;
+    setApplying(true);
     try {
       const engine = await apply(change, rows.map((r) => r.dish.id));
       setPhase({ kind: "applied", engine, count: rows.length });
     } catch (e) {
-      setPhase({ kind: "error", message: e instanceof Error ? e.message : "Write failed" });
+      setPhase({
+        kind: "error",
+        message: e instanceof Error ? e.message : "Write failed",
+        retry: { op: "apply", rows, engine: previewEngine },
+      });
+    } finally {
+      applyingRef.current = false;
+      setApplying(false);
     }
+  };
+
+  const retry = () => {
+    if (phase.kind !== "error") return;
+    const r = phase.retry;
+    if (r.op === "preview") void preview();
+    else void commit(r.rows, r.engine);
   };
 
   const product = kitchen.products.find((p) => p.id === change.productId);
@@ -106,14 +134,20 @@ export function SupplierChangeForm() {
           <Input value={change.note} onChange={(e) => set({ note: e.target.value })} />
         </label>
         <div className="flex flex-wrap items-center gap-3">
-          <Button onClick={preview} disabled={phase.kind === "previewing" || !change.note.trim()}>
-            {phase.kind === "previewing" ? "Walking the graph" : "Preview impact"}
+          <Button onClick={() => void preview()} disabled={previewing || applying || !change.note.trim()} aria-busy={previewing}>
+            {previewing ? "Walking the graph" : "Preview impact"}
           </Button>
           <span className="text-sm text-kiln/70">Supplier: {supplier?.name}</span>
         </div>
 
         {phase.kind === "error" && (
-          <p className="rounded-md bg-bad p-3 text-sm">Something failed: {phase.message}. Your menu was not changed.</p>
+          <ErrorState
+            className="bg-bad"
+            title={phase.retry.op === "apply" ? "The write did not go through" : "The preview did not run"}
+            hint={`${phase.message}. Your menu was not changed. Try again to send the same ${phase.retry.op === "apply" ? "change" : "question"}.`}
+            retryLabel={phase.retry.op === "apply" ? "Apply again" : "Preview again"}
+            onRetry={retry}
+          />
         )}
 
         {phase.kind === "preview" && (
@@ -141,8 +175,14 @@ export function SupplierChangeForm() {
                   ))}
                 </ul>
                 <div className="flex flex-wrap gap-3">
-                  <Button onClick={() => commit(phase.rows)}>Apply to the kitchen graph</Button>
-                  <Button variant="quiet" onClick={() => setPhase({ kind: "editing" })}>
+                  <Button
+                    onClick={() => void commit(phase.rows, phase.engine)}
+                    disabled={applying}
+                    aria-busy={applying}
+                  >
+                    {applying ? "Writing to the graph" : "Apply to the kitchen graph"}
+                  </Button>
+                  <Button variant="quiet" disabled={applying} onClick={() => setPhase({ kind: "editing" })}>
                     Discard
                   </Button>
                 </div>
