@@ -1,31 +1,23 @@
-// Relate adapter: the one module that talks to the Neo4j Relate embedded graph.
-//
-// Path 1 (submission path): NEXT_PUBLIC_RELATE_WASM_URL points at the @relate/relate-wasm
-// ES module. We import it at runtime, open an OPFS-backed store (opfs://sinapis-kitchen),
-// seed it from data/kitchen.json on first open, and run the Cypher below.
-// Path 2 (fallback): the env var is not set, or the module fails to load. The same
-// questions are answered by lib/kitchen-graph.ts, which walks the identical pattern.
-// Every call returns which engine answered, and the UI shows it.
+// Pure Relate pieces: the Cypher the app asks, the seed statements, the Engine label
+// and helpers that turn Relate rows into the app's path types. Nothing here opens a
+// database; only the dedicated Relate worker does that, one call at a time.
 import type { AllergenCode, Kitchen } from "@/lib/data";
-import {
-  dishPaths,
-  previewImpact,
-  stepFor,
-  type AllergenPath,
-  type ImpactRow,
-  type SpecChange,
-} from "@/lib/kitchen-graph";
+import { stepFor, type AllergenPath, type PathStep } from "@/lib/kitchen-graph";
 
 export type Engine = "relate-wasm" | "local-mirror";
 
 /** The queries judges can paste into `relate` against ./kitchen (see README). */
 export const CYPHER = {
+  dishCount: `MATCH (d:Dish) RETURN count(d) AS n`,
   dishAllergenPaths: `MATCH p = (d:Dish {id: $dishId})-[:USES*1..6]->(:Ingredient)-[:SUPPLIED_AS]->(sp:SupplierProduct)-[r:CONTAINS|MAY_CONTAIN]->(a:Allergen)
 RETURN a.code AS allergen, type(r) AS rel, [n IN nodes(p) | coalesce(n.id, n.code)] AS ids`,
   dishUnknownPaths: `MATCH p = (d:Dish {id: $dishId})-[:USES*1..6]->(:Ingredient)-[:SUPPLIED_AS]->(sp:SupplierProduct {specKnown: false})
 RETURN [n IN nodes(p) | n.id] AS ids`,
   productImpact: `MATCH p = (d:Dish)-[:USES*1..6]->(:Ingredient)-[:SUPPLIED_AS]->(sp:SupplierProduct {id: $productId})
 RETURN d.id AS dish, [n IN nodes(p) | n.id] AS ids`,
+  /** Read-back after a write: distinct dishes that reach the product through the new relationship. */
+  productReach: `MATCH (d:Dish)-[:USES*1..6]->(:Ingredient)-[:SUPPLIED_AS]->(sp:SupplierProduct {id: $productId})-[:CONTAINS|MAY_CONTAIN]->(:Allergen {code: $allergen})
+RETURN DISTINCT d.id AS dish`,
   clearDeclaration: `MATCH (sp:SupplierProduct {id: $productId})-[r:CONTAINS|MAY_CONTAIN]->(:Allergen {code: $allergen}) DELETE r`,
   addContains: `MATCH (sp:SupplierProduct {id: $productId}), (a:Allergen {code: $allergen}) MERGE (sp)-[:CONTAINS]->(a)`,
   addMayContain: `MATCH (sp:SupplierProduct {id: $productId}), (a:Allergen {code: $allergen}) MERGE (sp)-[:MAY_CONTAIN]->(a)`,
@@ -52,85 +44,33 @@ export function seedStatements(k: Kitchen): string[] {
   return out;
 }
 
-type Row = Record<string, unknown>;
-interface RelateDb { run(cypher: string, params?: Row): Promise<Row[]> }
+export type Row = Record<string, unknown>;
 
-let dbPromise: Promise<RelateDb | null> | null = null;
-// Relate WASM rejects re-entrant calls, so every query goes through one promise queue.
-let queue: Promise<unknown> = Promise.resolve();
-function enqueue<T>(job: () => Promise<T>): Promise<T> {
-  const next = queue.then(job, job);
-  queue = next.catch(() => undefined);
-  return next;
+const asIds = (ids: unknown): string[] => (Array.isArray(ids) ? ids.map((x) => String(x)) : []);
+
+/** Relate returns node ids along a path; the kitchen turns them into labelled steps. */
+export function idsToSteps(k: Kitchen, ids: unknown): PathStep[] {
+  return asIds(ids).map((id) => stepFor(k, id));
 }
 
-async function openRelate(k: Kitchen): Promise<RelateDb | null> {
-  const url = process.env.NEXT_PUBLIC_RELATE_WASM_URL;
-  if (!url || typeof window === "undefined") return null;
-  try {
-    const mod = await import(/* webpackIgnore: true */ url);
-    // TODO: confirm the exact @relate/relate-wasm export once pinned; we expect
-    // `open(uri)` returning an object with `run(cypher, params) => rows`.
-    const db: RelateDb = await mod.open("opfs://sinapis-kitchen");
-    const rows = await db.run("MATCH (d:Dish) RETURN count(d) AS n");
-    if (Number(rows[0]?.n ?? 0) === 0) {
-      for (const stmt of seedStatements(k)) await db.run(stmt);
-    }
-    return db;
-  } catch (err) {
-    console.warn("Relate WASM unavailable, using the local mirror", err);
-    return null;
+/** Rows of CYPHER.dishAllergenPaths and CYPHER.dishUnknownPaths, as AllergenPath[]. */
+export function rowsToPaths(k: Kitchen, known: Row[], unknown: Row[]): AllergenPath[] {
+  return [
+    ...known.map((r) => ({
+      allergen: String(r.allergen) as AllergenCode,
+      status: r.rel === "CONTAINS" ? ("contains" as const) : ("may" as const),
+      steps: idsToSteps(k, r.ids),
+    })),
+    ...unknown.map((r) => ({ allergen: null, status: "unknown" as const, steps: idsToSteps(k, r.ids) })),
+  ];
+}
+
+/** Rows of CYPHER.productImpact: the first path per reached dish. */
+export function reachedDishes(k: Kitchen, rows: Row[]): Map<string, PathStep[]> {
+  const out = new Map<string, PathStep[]>();
+  for (const r of rows) {
+    const dish = String(r.dish);
+    if (!out.has(dish)) out.set(dish, idsToSteps(k, r.ids));
   }
-}
-
-function relate(k: Kitchen) {
-  if (!dbPromise) dbPromise = openRelate(k);
-  return dbPromise;
-}
-
-const idsToSteps = (k: Kitchen, ids: unknown) => (ids as string[]).map((id) => stepFor(k, id));
-
-export async function fetchDishPaths(k: Kitchen, dishId: string): Promise<{ engine: Engine; paths: AllergenPath[] }> {
-  const db = await relate(k);
-  if (!db) return { engine: "local-mirror", paths: dishPaths(k, dishId) };
-  return enqueue(async () => {
-    const known = await db.run(CYPHER.dishAllergenPaths, { dishId });
-    const unknown = await db.run(CYPHER.dishUnknownPaths, { dishId });
-    const paths: AllergenPath[] = [
-      ...known.map((r) => ({
-        allergen: r.allergen as AllergenCode,
-        status: r.rel === "CONTAINS" ? ("contains" as const) : ("may" as const),
-        steps: idsToSteps(k, r.ids),
-      })),
-      ...unknown.map((r) => ({ allergen: null, status: "unknown" as const, steps: idsToSteps(k, r.ids) })),
-    ];
-    return { engine: "relate-wasm" as const, paths };
-  });
-}
-
-export async function fetchImpact(k: Kitchen, c: SpecChange): Promise<{ engine: Engine; rows: ImpactRow[] }> {
-  const local = previewImpact(k, c);
-  const db = await relate(k);
-  if (!db) return { engine: "local-mirror", rows: local };
-  return enqueue(async () => {
-    // Reverse traversal in Relate decides WHICH dishes are reached; statuses come from paths.
-    const hits = await db.run(CYPHER.productImpact, { productId: c.productId });
-    const reached = new Map(hits.map((h) => [h.dish as string, idsToSteps(k, h.ids)]));
-    const rows = local
-      .filter((r) => reached.has(r.dish.id))
-      .map((r) => ({ ...r, via: reached.get(r.dish.id) ?? r.via }));
-    return { engine: "relate-wasm" as const, rows };
-  });
-}
-
-/** Write transaction after the chef confirms. The local mirror is updated by the caller. */
-export async function commitSpecChange(k: Kitchen, c: SpecChange): Promise<Engine> {
-  const db = await relate(k);
-  if (!db) return "local-mirror";
-  await enqueue(async () => {
-    await db.run(CYPHER.clearDeclaration, { productId: c.productId, allergen: c.allergen });
-    if (c.kind === "contains") await db.run(CYPHER.addContains, { productId: c.productId, allergen: c.allergen });
-    if (c.kind === "may") await db.run(CYPHER.addMayContain, { productId: c.productId, allergen: c.allergen });
-  });
-  return "relate-wasm";
+  return out;
 }
