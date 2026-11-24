@@ -37,7 +37,8 @@ Relate is the engine that answers. If you remove the relationships, no cell in t
 | --- | --- | --- |
 | Why does this dish carry this allergen? | forward variable-length path, Dish to Allergen | `CYPHER.dishAllergenPaths` in `lib/relate.ts` |
 | Which dishes break if this product changes? | reverse traversal from one SupplierProduct | `CYPHER.productImpact` |
-| What becomes safe if one sauce is swapped? | path minus one node, re-evaluated | `guestCheck` in `lib/kitchen-graph.ts`, still on the local mirror; the Cypher version is the next planned step |
+| Which dishes are safe for this guest? | no CONTAINS, MAY_CONTAIN or unknown-spec path to the guest's allergen codes | `CYPHER.guestSafeDishes`, asked by `guestCheck` in `lib/adapter.real.ts` |
+| What becomes safe if one sauce is swapped? | every offending path runs through one substitutable node, and the replacement reaches no offending product | `CYPHER.guestSwap` (the substitution list comes from `data/kitchen.json` as the `$swaps` parameter) |
 | Accept the supplier's change | delete and merge one relationship, then read back the reached dishes | `CYPHER.clearDeclaration`, `addContains` or `addMayContain`, then `productReach`, sent in one worker round by `applyChange` in `lib/adapter.real.ts` |
 
 ### Which Relate mode, and why
@@ -49,7 +50,18 @@ We use **two modes on purpose**:
 
 In-memory mode is not used for the store. It would leave nothing for a judge to inspect.
 
-With `ADAPTER_MODE=real`, the browser starts one dedicated module worker (`lib/relate.worker.ts`) that loads `@relate/relate-wasm`, opens `opfs://sinapis-kitchen` and seeds it once from `data/kitchen.json` when it holds no `:Dish` node. Every query goes through one promise queue inside that worker, because the WASM build rejects re-entrant calls. The page talks to the worker through `lib/relate-client.ts`, with an 8 s timeout and exactly one retry per call. The dish path list, the impact preview and the write run on Relate. If the worker cannot load or does not answer, the same question is answered by `lib/kitchen-graph.ts`, a local mirror of the same patterns, and the note under the answer says "Sample data: answered by the local graph mirror, not by Relate." With the default `ADAPTER_MODE=fake`, everything answers from the mirror and says so. The matrix itself, the guest check and the API routes always answer from the mirror.
+With `ADAPTER_MODE=real`, the browser starts one dedicated module worker (`lib/relate.worker.ts`) that loads `@relate/relate-wasm`, runs its `init()`, opens `opfs://sinapis-kitchen` with `RelateDb.open` and seeds it from `data/kitchen.json` when the seed marker is missing. Every statement goes through `db.execute(query, paramsJson)` inside one promise queue, because the WASM build rejects re-entrant calls. The page talks to the worker through `lib/relate-client.ts`. The dish path list, the impact preview, the write and the guest check (safe dishes and one-swap dishes) run on Relate. If the worker cannot load or does not answer, the same question is answered by `lib/kitchen-graph.ts`, a local mirror of the same patterns, and the note under the answer says "Sample data: answered by the local graph mirror, not by Relate." With the default `ADAPTER_MODE=fake`, everything answers from the mirror and says so. The matrix itself and the API routes always answer from the mirror.
+
+Five-second rule: opening the worker (module download, OPFS open, first seed) has 3 s; one query attempt has 2 s, with exactly one retry, and the whole call is capped at 4.8 s. A worker that fails to open stays off for the session and every later question goes straight to the mirror. The provider asks one path query right after the page mounts, so the worker is warm before the first click on a cell.
+
+### Reset and persistence
+
+The only state that changes during the demo is the list of supplier changes applied in this browser. It lives in two places, both in the browser, both behind small wrappers:
+
+- `localStorage` key `sinapis.applied.v1`, read and written only by `lib/store.ts`. The matrix replays this list on the seed, so it survives a reload in either mode.
+- The Relate OPFS store `opfs://sinapis-kitchen` (real mode only), written by the apply in the worker.
+
+The server holds no state: there is no database, no KV and no runtime file write, so there is no migration and no schema push. To return a browser to the demo start state, press "Reset to seed" on the overview (shown after a local change) or open `/?reset=1`. Both clear the localStorage list and, in real mode, wipe the OPFS store and write the seed again in one queued worker job. `npm run demo:reset` rebuilds `kitchen/seed.cypher` (and `kitchen/store` when the `relate` CLI is on PATH) and prints the reset URL and the walk list.
 
 ### Three queries to paste into `relate` against ./kitchen
 
@@ -86,7 +98,8 @@ npm install
 npm run dev          # http://localhost:3000, works with zero env vars
 npm run seed         # writes kitchen/seed.cypher and, if `relate` is on PATH, rebuilds kitchen/store
 npm test             # pinned kitchen facts and input schemas (node:test through tsx)
-npm run proof        # runs the tests, the seed and a Relate query, and rewrites the proof blocks below
+npm run proof        # runs the tests, the seed and the Relate queries, and rewrites the proof blocks below
+npm run demo:reset   # rebuilds the seed, prints the /?reset=1 URL and the three-cycle demo walk
 ```
 
 To run the browser path on Relate instead of the local mirror, copy `.env.example` to `.env.local` and set `ADAPTER_MODE=real`. The bundled `@relate/relate-wasm` package is used; `NEXT_PUBLIC_RELATE_WASM_URL` is only an optional override for loading the module from another URL. The note under each answer says "Live engine: Relate (WASM, stored in this browser with OPFS)." when Relate answered, and "Sample data: answered by the local graph mirror, not by Relate." when it did not.
@@ -97,12 +110,16 @@ To run the browser path on Relate instead of the local mirror, copy `.env.exampl
 
 - Tests:
 <!-- PROOF:BEGIN tests -->
-`npm test` on 2026-11-24: 14 passed, 0 failed, exit 0, 0.8 s.
+`npm test` on 2026-11-24: 17 passed, 0 failed, exit 0, 0.9 s.
 <!-- PROOF:END tests -->
 - Relate engine:
 <!-- PROOF:BEGIN relate-engine -->
-Not run in this build: no in-memory store opened (open(): Cannot read properties of undefined (reading '__wbindgen_malloc'); memory://: Cannot read properties of undefined (reading '__wbindgen_malloc'); :memory:: Cannot read properties of undefined ().
+`CYPHER.productImpact` for `p-tahini` on @relate/relate-wasm 1.2.0 in Node, in-memory store seeded with 187 statements, on 2026-11-24: 8 rows, 7 distinct dishes, 15.6 ms.
 <!-- PROOF:END relate-engine -->
+- Guest check on Relate (Sesame plus Celery):
+<!-- PROOF:BEGIN guest -->
+`CYPHER.guestSafeDishes` and `CYPHER.guestSwap` for Sesame plus Celery on @relate/relate-wasm 1.2.0 in Node, in-memory store seeded with 187 statements, on 2026-11-24: 3 safe dishes (cacik, grilled-sea-bass, zucchini-fritters), 3 safe with one swap (baba-ghanoush, fried-calamari, roast-cauliflower), roasted cauliflower with the garlic yogurt sauce swap: yes, 53.8 ms.
+<!-- PROOF:END guest -->
 - Seed store:
 <!-- PROOF:BEGIN seed-store -->
 `node scripts/seed-store.mjs` on 2026-11-24: wrote kitchen/seed.cypher with 187 statements for 16 dishes. kitchen/store built: no (seed: store not built, the relate CLI is not on PATH (ENOENT).).
@@ -117,7 +134,7 @@ Not run in this build: no in-memory store opened (open(): Cannot read properties
 - Import a supplier spec sheet PDF and propose the graph change for the chef to confirm.
 - A printable allergen card per dish, with the path printed beside each flag for the inspector.
 - Several sites sharing one supplier graph, so a change at one supplier warns every kitchen that uses it.
-- A Cytoscape panel that draws the dish subgraph instead of the text path.
+- A graph panel on the dish page that draws the dish subgraph (layout computed with d3, rendered in React) instead of the text path.
 
 ## Declarations
 

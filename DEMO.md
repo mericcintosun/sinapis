@@ -23,9 +23,13 @@ Seed ids used below (checked against `data/kitchen.json`): dish `grilled-sea-bas
 
 ## What runs where
 
-- Steps 2 to 5 (path click, preview, Apply, read-back) run on Relate WASM (`@relate/relate-wasm` in a dedicated browser worker, store `opfs://sinapis-kitchen`) when `ADAPTER_MODE=real`, and on the local graph mirror (`lib/kitchen-graph.ts`) when `ADAPTER_MODE=fake`. If the worker cannot load or times out in real mode, the mirror answers instead.
+- Steps 2 to 5 (path click, preview, Apply, read-back) and the step 6 guest check (`CYPHER.guestSafeDishes` and `CYPHER.guestSwap`) run on Relate WASM (`@relate/relate-wasm` in a dedicated browser worker, store `opfs://sinapis-kitchen`) when `ADAPTER_MODE=real`, and on the local graph mirror (`lib/kitchen-graph.ts`) when `ADAPTER_MODE=fake`. If the worker cannot load or times out in real mode, the mirror answers instead, in the same adapter function, inside 5 seconds.
 - Every answer carries a note that says which engine produced it: "Live engine: Relate (WASM, stored in this browser with OPFS)." or "Sample data: answered by the local graph mirror, not by Relate."
-- The matrix on `/` is drawn from the mirror in both modes, by replaying the applied changes on the seed, so it renders in server HTML.
-- Step 6's guest check is still on the mirror. Query 2 runs in the `relate` CLI against `kitchen/store`.
+- The matrix on `/` (step 1) is drawn from the mirror in both modes, by replaying the applied changes on the seed, so it renders in server HTML. Its note says so.
+- Query 2 at the end of step 6 runs in the `relate` CLI against `kitchen/store`.
+
+## Reset between cycles
+
+Open `/?reset=1` (or press "Reset to seed" on the overview) before each cycle. It clears the supplier changes stored in this browser (`localStorage`, through `lib/store.ts`) and, in real mode, wipes and re-seeds the OPFS store. The server holds no state. `npm run demo:reset` rebuilds the seed files and prints the reset URL and this walk list. Walk steps 1 to 6 three times in a row: the results must be identical and no step may take over 5 seconds.
 
 Sinapis is decision support, not a medical guarantee.

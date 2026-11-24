@@ -17,6 +17,8 @@ npm run seed    # writes kitchen/seed.cypher, builds kitchen/store if the relate
 - Tailwind v4: there is no `tailwind.config`. Tokens live in the `@theme` block of `app/globals.css`, the only file allowed to hold hex colors (plus `lib/brand-colors.ts` for the OG image, which cannot read CSS variables).
 - Relate WASM rejects re-entrant calls. Keep the single promise queue in `lib/relate.worker.ts`; never call the database outside its `callDb`.
 - `opfs://` stores work only inside a dedicated worker. The page reaches it only through `lib/relate-client.ts`, imported only by `lib/adapter.real.ts`.
+- `lib/store.ts` is the only browser-state wrapper: no other module touches `localStorage`. Every access is guarded by `typeof window` and `try`, and nothing reads `window` at module load, so tests can import it.
+- `@relate/relate-wasm` 1.2.0 API: default export `init()` must run first; `RelateDb.open("opfs://name")` in the worker; `db.execute(query, paramsJson)` returns a JSON envelope `{ columns, rows, stats, error }` and reports engine errors in `error` instead of throwing.
 - `lib/config.ts` is the only reader of `process.env` for app logic. `lib/adapter.ts` is the only module that branches on `ADAPTER_MODE`.
 - Tests: `npm test` (node:test through tsx, pure modules only). Proof: `npm run proof` rewrites the README proof blocks.
 - Relate Cypher uses `elementId()`, not `id()`. There is no APOC.
