@@ -46,16 +46,16 @@ export function OverviewBoard() {
   const focusRow = focus ? rows.find((r) => r.code === focus) : null;
 
   return (
-    <div className="space-y-8">
-      <section className="sinapis-rise rounded-md bg-deep p-5 md:p-7">
+    <div className="sinapis-rise-group space-y-8">
+      <section id="load" className="sinapis-rise scroll-mt-24 rounded-md bg-deep p-5 md:p-7">
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="text-3xl text-ink">Where the allergens sit</h2>
-            <p className="mt-1 max-w-[68ch] text-ink/85">
-              {focusRow
-                ? `${focusRow.name}: ${focusRow.contains} dishes contain it, ${focusRow.may} may contain it, ${focusRow.unknown} depend on a product with no spec sheet.`
-                : "Dishes flagged per allergen, computed from every path through the sub-recipes. Click a bar to focus the matrix."}
-            </p>
+            <h2 className="text-3xl text-ink md:text-4xl">Where the allergens sit</h2>
+            {focusRow && (
+              <p className="mt-1 text-ink">
+                {`${focusRow.name}: ${focusRow.contains} dishes contain it, ${focusRow.may} may contain it, ${focusRow.unknown} depend on a product with no spec sheet.`}
+              </p>
+            )}
           </div>
           {focus && (
             <Button variant="outline" size="sm" onClick={() => setFocus(null)}>
@@ -88,30 +88,34 @@ export function OverviewBoard() {
         </Card>
       )}
 
-      <Card id="matrix" className="sinapis-rise scroll-mt-24">
-        <CardHeader>
-          <CardTitle>Allergen matrix</CardTitle>
-          <CardDescription className="max-w-[68ch]">
+      <section id="matrix" className="sinapis-rise scroll-mt-24 space-y-4 rounded-md bg-surface p-5 md:p-7">
+        <div className="space-y-1">
+          <h2 className="text-3xl text-ink md:text-4xl">Allergen matrix</h2>
+          <p className="text-ink">
             {kitchen.dishes.length} dishes by the 14 EU allergens. C contains, M may contain, ? means a supplier never
             sent a spec sheet, so the dish is not cleared. Click any cell to see the path behind it.
-          </CardDescription>
-          <EngineNote engine={adapter.matrixEngine} mode={adapter.mode} className="pt-1" />
-        </CardHeader>
-        <CardContent>
-          {resetting || kitchen.dishes.length === 0 ? (
-            <MatrixEmptyState resetting={resetting} />
-          ) : (
-            <AllergenMatrix
-              dishes={kitchen.dishes}
-              allergens={kitchen.allergens}
-              matrix={matrix}
-              fresh={fresh}
-              focus={focus}
-              onFocus={setFocus}
-            />
-          )}
-        </CardContent>
-      </Card>
+          </p>
+        </div>
+        <Card>
+          <CardHeader className="pb-3">
+            <EngineNote engine={adapter.matrixEngine} mode={adapter.mode} />
+          </CardHeader>
+          <CardContent className="px-2 sm:px-5">
+            {resetting || kitchen.dishes.length === 0 ? (
+              <MatrixEmptyState resetting={resetting} />
+            ) : (
+              <AllergenMatrix
+                dishes={kitchen.dishes}
+                allergens={kitchen.allergens}
+                matrix={matrix}
+                fresh={fresh}
+                focus={focus}
+                onFocus={setFocus}
+              />
+            )}
+          </CardContent>
+        </Card>
+      </section>
     </div>
   );
 }

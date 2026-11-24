@@ -71,5 +71,8 @@ export const LOG_PREFIX = "[core]";
 /** Public origin for absolute metadata URLs (og:image, twitter:image). Not a secret. */
 export const SITE_URL: string = readSiteUrl() ?? "https://sinapis-nine.vercel.app";
 
+/** Public source repository, linked from the rail footer. A constant, not an env key. */
+export const REPO_URL = "https://github.com/mericcintosun/sinapis";
+
 /** Comma separated uploaded brand image names, written by next.config.ts at build time. */
 export const BRAND_FILES: string = readBrandFiles();

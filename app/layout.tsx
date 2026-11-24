@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { DM_Sans, DM_Serif_Display } from "next/font/google";
 import { AppRail } from "@/components/app-rail";
 import { KitchenProvider } from "@/components/kitchen-provider";
-import { SITE_URL } from "@/lib/config";
+import { REPO_URL, SITE_URL } from "@/lib/config";
 import "./globals.css";
 
 const display = DM_Serif_Display({
@@ -49,9 +49,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <AppRail />
             <main className="min-w-0 flex-1 px-4 pb-28 pt-6 md:px-10 md:pb-12 md:pt-10">
               {children}
-              <p className="mx-auto mt-12 max-w-6xl text-xs text-ink/75 md:hidden">
-                Decision support, not a medical guarantee. A missing spec sheet is never treated as allergen free.
-              </p>
+              <footer className="mx-auto mt-10 max-w-6xl space-y-1 text-sm text-ink md:hidden">
+                <p>Decision support, not a medical guarantee. A missing spec sheet is never treated as allergen free.</p>
+                <a
+                  href={REPO_URL}
+                  className="inline-flex min-h-11 items-center underline decoration-line underline-offset-4 hover:decoration-ink"
+                >
+                  Source on GitHub
+                </a>
+              </footer>
             </main>
           </div>
         </KitchenProvider>
