@@ -1,19 +1,22 @@
 // Real adapter: the path list, the impact preview and the write run on Relate WASM in a
 // dedicated browser worker with an OPFS store (opfs://sinapis-kitchen).
 //
+// The guest check (step 6) and the demo reset (wipe and re-seed the OPFS store) run there too.
+//
 // On the server (no window), when the worker fails, or when it times out, every method
 // answers from the local mirror and says so with engine "local-mirror".
-// getKitchen, getMatrix, guestCheck, replay and matrixOf stay on the mirror.
+// getKitchen, getMatrix, replay and matrixOf stay on the mirror (the matrix by design).
 import { seedKitchen, type Kitchen } from "@/lib/data";
 import {
   applySpecChange,
   dishesUsingProduct,
   dishPaths,
+  guestCheck as mirrorGuestCheck,
   previewImpact as mirrorPreviewImpact,
   type SpecChange,
 } from "@/lib/kitchen-graph";
-import { CYPHER, reachedDishes, rowsToPaths } from "@/lib/relate";
-import { relateAvailable, runBatch, runCypher, type Statement } from "@/lib/relate-client";
+import { CYPHER, reachedDishes, rowsToGuest, rowsToPaths } from "@/lib/relate";
+import { relateAvailable, resetRelate, runBatch, runCypher, type Statement } from "@/lib/relate-client";
 import { LOG_PREFIX } from "@/lib/config";
 import { errorCodeOf, type ErrorCode } from "@/lib/errors";
 import { fakeAdapter, replay } from "@/lib/adapter.fake";
@@ -107,7 +110,51 @@ export const realAdapter: KitchenAdapter = {
     }
   },
 
-  guestCheck: fakeAdapter.guestCheck,
+  async guestCheck(allergens, kitchen = seedKitchen) {
+    // Step 6. Relate decides safe and one-swap dishes; the mirror answer is the fallback,
+    // computed here so a failure never leaves the guest list empty.
+    const local = mirrorGuestCheck(kitchen, allergens);
+    if (allergens.length === 0 || !canAsk("guest")) return { engine: "local-mirror", data: local };
+    const t0 = now();
+    try {
+      const swaps = kitchen.substitutions.map((s) => ({ from: s.from, to: s.to }));
+      const [safeRows, swapRows] = await runBatch([
+        { cypher: CYPHER.guestSafeDishes, params: { codes: allergens } },
+        { cypher: CYPHER.guestSwap, params: { codes: allergens, swaps } },
+      ]);
+      const data = rowsToGuest(kitchen, allergens, safeRows, swapRows);
+      const relateSafe = new Set(data.safe.map((d) => d.id));
+      const mirrorSafe = new Set(local.safe.map((d) => d.id));
+      const mismatch =
+        [...relateSafe].filter((d) => !mirrorSafe.has(d)).length + [...mirrorSafe].filter((d) => !relateSafe.has(d)).length;
+      console.info(
+        `${LOG_PREFIX} guest codes=${allergens.join(",")} safe=${data.safe.length} swap=${data.swappable.length} ${Math.round(now() - t0)}ms`,
+      );
+      if (mismatch === 0) console.info(`${LOG_PREFIX} parity ok`);
+      else console.warn(`${LOG_PREFIX} parity mismatch ${mismatch}`);
+      return { engine: RELATE, data };
+    } catch (e) {
+      fallback(errorCodeOf(e), "guest");
+      return { engine: "local-mirror", data: local };
+    }
+  },
+
+  async resetStore() {
+    if (!canAsk("reset")) return "local-mirror";
+    try {
+      const done = await resetRelate();
+      if (!done) {
+        fallback("not_configured", "reset");
+        return "local-mirror";
+      }
+      console.info(`${LOG_PREFIX} reset store=opfs ok`);
+      return RELATE;
+    } catch (e) {
+      fallback(errorCodeOf(e), "reset");
+      return "local-mirror";
+    }
+  },
+
   replay,
   matrixOf: fakeAdapter.matrixOf,
 };

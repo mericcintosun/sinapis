@@ -184,6 +184,13 @@ export function guestCheck(k: Kitchen, codes: AllergenCode[]): GuestAnswer {
   return answer;
 }
 
+/** The line a waiter reads out: "Roasted cauliflower: garlic yogurt sauce instead of tahini lemon sauce". */
+export function swapLine(dish: Dish, swap: Substitution): string {
+  const short = dish.name.split(",")[0].trim();
+  const note = swap.note.length > 0 ? swap.note[0].toLowerCase() + swap.note.slice(1) : swap.note;
+  return `${short}: ${note}`;
+}
+
 /** Per-allergen counts of flagged dishes, for the overview chart. */
 export function allergenLoad(k: Kitchen, m: Matrix) {
   return k.allergens.map((a) => {

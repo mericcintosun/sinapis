@@ -8,10 +8,13 @@ import {
   buildMatrix,
   dishesUsingProduct,
   dishPaths,
+  guestCheck,
   previewImpact,
+  swapLine,
   type SpecChange,
 } from "@/lib/kitchen-graph";
-import { seedStatements } from "@/lib/relate";
+import { rowsToGuest, seedStatements } from "@/lib/relate";
+import { changeKey } from "@/lib/store";
 
 const TAHINI_DISHES = [
   "baba-ghanoush",
@@ -82,6 +85,45 @@ test("a product with specKnown false yields unknown, never free", () => {
     }
   }
   assert.equal(matrix["shepherd-salad"].PNT, "unknown");
+});
+
+test("guest check, Sesame plus Celery: roasted cauliflower is safe with the yogurt sauce swap", () => {
+  const answer = guestCheck(seedKitchen, ["SES", "CEL"]);
+  const cauliflower = answer.swappable.find((s) => s.dish.id === "roast-cauliflower");
+  assert.ok(cauliflower, "roast-cauliflower is in the swap list");
+  assert.equal(cauliflower.swap.from, "sr-tahini-sauce");
+  assert.equal(cauliflower.swap.to, "sr-yogurt-sauce");
+  assert.equal(
+    swapLine(cauliflower.dish, cauliflower.swap),
+    "Roasted cauliflower: garlic yogurt sauce instead of tahini lemon sauce",
+  );
+  // Unknown is never safe: the dishes that touch loose pul biber stay off the safe list.
+  const safe = answer.safe.map((d) => d.id);
+  assert.ok(!safe.includes("shepherd-salad"));
+  assert.ok(!safe.includes("muhammara"));
+  // Every dish lands in exactly one list.
+  const all = [...safe, ...answer.swappable.map((s) => s.dish.id), ...answer.unsafe.map((u) => u.dish.id)].sort();
+  assert.deepEqual(all, seedKitchen.dishes.map((d) => d.id).sort());
+});
+
+test("rowsToGuest maps Relate rows to the same answer the mirror gives", () => {
+  const codes = ["SES", "CEL"] as const;
+  const mirror = guestCheck(seedKitchen, [...codes]);
+  const safeRows = mirror.safe.map((d) => ({ dish: d.id }));
+  const swapRows = mirror.swappable.map((s) => ({ dish: s.dish.id, swapFrom: s.swap.from, swapTo: s.swap.to }));
+  const mapped = rowsToGuest(seedKitchen, [...codes], safeRows, swapRows);
+  assert.deepEqual(mapped.safe.map((d) => d.id), mirror.safe.map((d) => d.id));
+  assert.deepEqual(
+    mapped.swappable.map((s) => `${s.dish.id}:${s.swap.from}`),
+    mirror.swappable.map((s) => `${s.dish.id}:${s.swap.from}`),
+  );
+  assert.deepEqual(mapped.unsafe.map((u) => u.dish.id), mirror.unsafe.map((u) => u.dish.id));
+});
+
+test("changeKey identifies a change by product, allergen and declaration", () => {
+  assert.equal(changeKey(DEMO_CHANGE), "p-tahini:PNT:may");
+  assert.equal(changeKey({ ...DEMO_CHANGE, note: "another email" }), changeKey(DEMO_CHANGE));
+  assert.notEqual(changeKey({ ...DEMO_CHANGE, kind: "contains" }), changeKey(DEMO_CHANGE));
 });
 
 test("seedStatements is deterministic", () => {

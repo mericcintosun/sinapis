@@ -6,6 +6,8 @@
 //   <!-- PROOF:BEGIN tests -->          npm test (60 s budget), pass and fail counts
 //   <!-- PROOF:BEGIN relate-engine -->  @relate/relate-wasm in Node, in-memory store,
 //                                       CYPHER.productImpact for p-tahini, rows and latency
+//   <!-- PROOF:BEGIN guest -->          CYPHER.guestSafeDishes and guestSwap for Sesame plus
+//                                       Celery on the same in-memory store (DEMO.md step 6)
 //   <!-- PROOF:BEGIN seed-store -->     node scripts/seed-store.mjs, statement count, store built
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -59,33 +61,32 @@ function withTimeout(promise, ms, what) {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
-function productImpactCypher() {
+function cypherOf(key) {
   const src = readFileSync("lib/relate.ts", "utf8");
-  const m = src.match(/productImpact:\s*`([^`]+)`/);
+  const m = src.match(new RegExp(`${key}:\\s*\`([^\`]+)\``));
   return m ? m[1] : null;
 }
 
-function plain(v) {
-  if (typeof v === "bigint") return Number(v);
-  if (v instanceof Map) return Object.fromEntries([...v.entries()].map(([k, x]) => [String(k), plain(x)]));
-  if (Array.isArray(v)) return v.map(plain);
-  return v;
+// @relate/relate-wasm 1.2.0: db.execute(query, paramsJson | null) returns a JSON envelope
+// { columns, rows, stats, error }. Engine errors arrive in `error` and do not throw.
+function exec(db, cypher, params) {
+  const raw = db.execute(cypher, params && Object.keys(params).length > 0 ? JSON.stringify(params) : null);
+  const env = JSON.parse(raw);
+  if (env && env.error) throw new Error(`Relate error: ${oneLine(env.error)}`);
+  const columns = Array.isArray(env?.columns) ? env.columns : [];
+  const rows = Array.isArray(env?.rows) ? env.rows : [];
+  return rows.map((row) => (Array.isArray(row) ? Object.fromEntries(columns.map((c, i) => [c, row[i]])) : row));
 }
 
-function toRows(result) {
-  const r = plain(result);
-  if (Array.isArray(r)) return r;
-  if (r && Array.isArray(r.rows)) return r.rows;
-  if (r && Array.isArray(r.records)) return r.records;
-  if (r && Array.isArray(r.data)) return r.data;
-  throw new Error("unknown result shape");
-}
+// Filled by proveRelateEngine once the in-memory store is seeded, so the guest proof
+// reuses the same store instead of loading the module twice.
+let seeded = null;
 
 async function proveRelateEngine() {
   const pkgJson = "node_modules/@relate/relate-wasm/package.json";
   if (!existsSync(pkgJson)) return "Not run in this build: @relate/relate-wasm is not installed in node_modules.";
   const version = JSON.parse(readFileSync(pkgJson, "utf8")).version ?? "unknown version";
-  const cypher = productImpactCypher();
+  const cypher = cypherOf("productImpact");
   if (!cypher) return "Not run in this build: CYPHER.productImpact was not found in lib/relate.ts.";
   if (!existsSync("kitchen/seed.cypher")) return "Not run in this build: kitchen/seed.cypher is missing.";
   const statements = readFileSync("kitchen/seed.cypher", "utf8")
@@ -99,45 +100,60 @@ async function proveRelateEngine() {
   } catch (e) {
     return `Not run in this build: @relate/relate-wasm ${version} did not load in Node (${oneLine(e?.message ?? e)}).`;
   }
+  // In Node, init() cannot fetch a file:// URL, so the binary is handed over as bytes.
+  const wasmFile = "node_modules/@relate/relate-wasm/relate_bg.wasm";
   try {
-    if (typeof mod.init === "function") await mod.init();
-    else if (typeof mod.default === "function" && typeof mod.default.open !== "function" && !mod.RelateDb && typeof mod.open !== "function") await mod.default();
+    if (typeof mod.initSync !== "function") throw new Error("no initSync export");
+    mod.initSync({ module: readFileSync(wasmFile) });
   } catch (e) {
     return `Not run in this build: @relate/relate-wasm ${version} init failed in Node (${oneLine(e?.message ?? e)}).`;
   }
-  const ns = mod.RelateDb ?? mod.default?.RelateDb ?? mod.Relate ?? mod.default ?? mod;
-  const open = typeof ns?.open === "function" ? ns.open.bind(ns) : typeof mod.open === "function" ? mod.open.bind(mod) : null;
-  if (!open) return `Not run in this build: @relate/relate-wasm ${version} exposes no open().`;
+  if (typeof mod.RelateDb !== "function") return `Not run in this build: @relate/relate-wasm ${version} exports no RelateDb.`;
 
-  let db = null;
-  const tried = [];
-  for (const uri of [undefined, "memory://", ":memory:"]) {
-    try {
-      db = await withTimeout(Promise.resolve(uri === undefined ? open() : open(uri)), 5_000, "opening a store");
-      if (db) break;
-    } catch (e) {
-      tried.push(`${uri ?? "open()"}: ${oneLine(e?.message ?? e)}`);
-    }
+  let db;
+  try {
+    db = new mod.RelateDb();
+  } catch (e) {
+    return `Not run in this build: no in-memory store opened (${oneLine(e?.message ?? e)}).`;
   }
-  if (!db) return `Not run in this build: no in-memory store opened (${tried.join("; ").slice(0, 200)}).`;
-  const method = ["query", "run", "execute"].find((m) => typeof db[m] === "function");
-  if (!method) return `Not run in this build: the database exposes no query, run or execute method.`;
 
   try {
-    await withTimeout(
-      (async () => {
-        for (const s of statements) await db[method](s, {});
-      })(),
-      15_000,
-      "seeding",
-    );
+    for (const s of statements) exec(db, s);
+    seeded = { db, version, statements: statements.length };
     const t0 = performance.now();
-    const rows = toRows(await withTimeout(Promise.resolve(db[method](cypher, { productId: "p-tahini" })), 5_000, "the query"));
+    const rows = exec(db, cypher, { productId: "p-tahini" });
     const ms = (performance.now() - t0).toFixed(1);
     const dishes = new Set(rows.map((r) => (r && typeof r === "object" ? r.dish : undefined)).filter(Boolean));
     return `\`CYPHER.productImpact\` for \`p-tahini\` on @relate/relate-wasm ${version} in Node, in-memory store seeded with ${statements.length} statements, on ${today}: ${rows.length} rows, ${dishes.size} distinct dishes, ${ms} ms.`;
   } catch (e) {
     return `Not run in this build: the Relate query failed in Node (${oneLine(e?.message ?? e)}).`;
+  }
+}
+
+// 4. Guest check (DEMO.md step 6) on the same in-memory store: Sesame plus Celery.
+async function proveGuest(engineLine) {
+  if (!seeded) {
+    const why = engineLine.startsWith("Not run in this build: ") ? engineLine.slice("Not run in this build: ".length) : "the engine proof did not seed a store.";
+    return `Not run in this build: ${why}`;
+  }
+  const safeCypher = cypherOf("guestSafeDishes");
+  const swapCypher = cypherOf("guestSwap");
+  if (!safeCypher || !swapCypher) return "Not run in this build: CYPHER.guestSafeDishes or CYPHER.guestSwap was not found in lib/relate.ts.";
+  const kitchen = JSON.parse(readFileSync("data/kitchen.json", "utf8"));
+  const swaps = kitchen.substitutions.map((s) => ({ from: s.from, to: s.to }));
+  const codes = ["SES", "CEL"];
+  const { db, version, statements } = seeded;
+  try {
+    const t0 = performance.now();
+    const safeRows = exec(db, safeCypher, { codes });
+    const swapRows = exec(db, swapCypher, { codes, swaps });
+    const ms = (performance.now() - t0).toFixed(1);
+    const safe = [...new Set(safeRows.map((r) => r?.dish).filter(Boolean))].sort();
+    const swapDishes = [...new Set(swapRows.map((r) => r?.dish).filter(Boolean))].sort();
+    const cauliflower = swapRows.some((r) => r?.dish === "roast-cauliflower" && r?.swapFrom === "sr-tahini-sauce" && r?.swapTo === "sr-yogurt-sauce");
+    return `\`CYPHER.guestSafeDishes\` and \`CYPHER.guestSwap\` for Sesame plus Celery on @relate/relate-wasm ${version} in Node, in-memory store seeded with ${statements} statements, on ${today}: ${safe.length} safe dishes (${safe.join(", ") || "none"}), ${swapDishes.length} safe with one swap (${swapDishes.join(", ") || "none"}), roasted cauliflower with the garlic yogurt sauce swap: ${cauliflower ? "yes" : "no"}, ${ms} ms.`;
+  } catch (e) {
+    return `Not run in this build: the guest queries failed in Node (${oneLine(e?.message ?? e)}).`;
   }
 }
 
@@ -161,15 +177,21 @@ async function main() {
   } catch (e) {
     results["relate-engine"] = `Not run in this build: ${oneLine(e?.message ?? e)}.`;
   }
+  try {
+    results["guest"] = await withTimeout(proveGuest(results["relate-engine"]), 15_000, "the guest proof");
+  } catch (e) {
+    results["guest"] = `Not run in this build: ${oneLine(e?.message ?? e)}.`;
+  }
 
+  const blocks = ["tests", "relate-engine", "guest", "seed-store"];
   if (!existsSync(README)) {
     console.log("proof: README.md not found, nothing written");
   } else {
     let readme = readFileSync(README, "utf8");
-    for (const name of ["tests", "relate-engine", "seed-store"]) readme = rewrite(readme, name, results[name]);
+    for (const name of blocks) readme = rewrite(readme, name, results[name]);
     writeFileSync(README, readme);
   }
-  for (const name of ["tests", "relate-engine", "seed-store"]) console.log(`proof ${name}: ${results[name]}`);
+  for (const name of blocks) console.log(`proof ${name}: ${results[name]}`);
 }
 
 main()
