@@ -18,10 +18,11 @@ const buttonVariants = cva(
         link: "text-ink underline decoration-line underline-offset-4 hover:decoration-ink",
       },
       size: {
-        default: "h-10 px-4",
-        sm: "h-8 px-3 text-xs",
+        // Below md every size reaches the 44 px touch target (min-h-11); desktop keeps the denser heights.
+        default: "h-10 px-4 max-md:min-h-11",
+        sm: "h-8 px-3 text-xs max-md:min-h-11",
         lg: "h-12 px-6 text-base",
-        icon: "h-10 w-10",
+        icon: "h-10 w-10 max-md:min-h-11 max-md:min-w-11",
       },
     },
     defaultVariants: { variant: "default", size: "default" },

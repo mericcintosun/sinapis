@@ -37,10 +37,10 @@ export function ChangeLog() {
           <li key={e.id} className="sinapis-rise">
             <Card>
               <CardHeader className="pb-3">
-                <CardDescription>
+                <CardDescription className="break-words">
                   {e.date} · {supplier?.name}
                 </CardDescription>
-                <CardTitle className="text-lg">
+                <CardTitle className="break-words text-lg">
                   {product?.name}: {KIND_WORD[e.kind]} {allergen?.name ?? ""}
                 </CardTitle>
               </CardHeader>
@@ -50,7 +50,12 @@ export function ChangeLog() {
                   {e.affectedDishIds.map((id) => {
                     const dish = kitchen.dishes.find((d) => d.id === id);
                     return (
-                      <Link key={id} href={`/dishes/${id}${e.allergen ? `?allergen=${e.allergen}` : ""}`}>
+                      <Link
+                        key={id}
+                        href={`/dishes/${id}${e.allergen ? `?allergen=${e.allergen}` : ""}`}
+                        title={dish?.name ?? id}
+                        className="inline-flex min-h-11 max-w-full items-center"
+                      >
                         <Badge variant={e.kind === "unknown" ? "unknown" : e.kind === "clear" ? "free" : e.kind}>{dish?.name ?? id}</Badge>
                       </Link>
                     );

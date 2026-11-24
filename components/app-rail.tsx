@@ -28,7 +28,7 @@ export function AppRail() {
 
       <nav
         aria-label="Sections"
-        className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-background md:static md:flex-col md:gap-1 md:border-t-0"
+        className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-background pb-[env(safe-area-inset-bottom)] md:static md:flex-col md:gap-1 md:border-t-0 md:pb-0"
       >
         {SECTIONS.map(({ href, label, icon: Icon }) => (
           <Link
@@ -36,7 +36,7 @@ export function AppRail() {
             href={href}
             aria-current={isActive(href) ? "page" : undefined}
             className={cn(
-              "flex flex-1 flex-col items-center gap-1 px-3 py-2.5 text-xs font-medium text-ink/80 md:flex-none md:flex-row md:gap-3 md:rounded-md md:text-sm",
+              "flex min-h-11 flex-1 flex-col items-center justify-center gap-1 px-3 py-2.5 text-xs font-medium text-ink/80 md:flex-none md:flex-row md:gap-3 md:rounded-md md:text-sm",
               isActive(href) ? "bg-surface text-ink" : "hover:bg-surface/60 hover:text-ink",
             )}
           >
@@ -47,7 +47,7 @@ export function AppRail() {
       </nav>
 
       <div className="md:mt-auto md:space-y-3">
-        <Button asChild variant="default" size="sm" className="md:h-11 md:w-full md:text-sm">
+        <Button asChild variant="default" size="sm" className="min-h-11 md:h-11 md:w-full md:text-sm">
           <Link href="/activity#log-change">Log supplier change</Link>
         </Button>
         <p className="hidden text-xs leading-relaxed text-ink/75 md:block">

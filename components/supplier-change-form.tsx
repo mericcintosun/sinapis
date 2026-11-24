@@ -99,10 +99,15 @@ export function SupplierChangeForm() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
-        <div className="grid gap-3 md:grid-cols-[2fr_1.2fr_1.2fr]">
-          <label className="space-y-1 text-sm font-medium">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-[2fr_1.2fr_1.2fr]">
+          <label className="min-w-0 space-y-1 text-sm font-medium">
             Supplier product
-            <Select value={change.productId} onChange={(e) => set({ productId: e.target.value })}>
+            <Select
+              value={change.productId}
+              title={product?.name}
+              onChange={(e) => set({ productId: e.target.value })}
+              className="truncate"
+            >
               {kitchen.products.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
@@ -110,7 +115,7 @@ export function SupplierChangeForm() {
               ))}
             </Select>
           </label>
-          <label className="space-y-1 text-sm font-medium">
+          <label className="min-w-0 space-y-1 text-sm font-medium">
             Declaration
             <Select value={change.kind} onChange={(e) => set({ kind: e.target.value as SpecChange["kind"] })}>
               <option value="may">May contain</option>
@@ -118,7 +123,7 @@ export function SupplierChangeForm() {
               <option value="clear">No longer declared</option>
             </Select>
           </label>
-          <label className="space-y-1 text-sm font-medium">
+          <label className="min-w-0 space-y-1 text-sm font-medium">
             Allergen
             <Select value={change.allergen} onChange={(e) => set({ allergen: e.target.value as AllergenCode })}>
               {kitchen.allergens.map((a) => (
@@ -137,7 +142,7 @@ export function SupplierChangeForm() {
           <Button onClick={() => void preview()} disabled={previewing || applying || !change.note.trim()} aria-busy={previewing}>
             {previewing ? "Walking the graph" : "Preview impact"}
           </Button>
-          <span className="text-sm text-kiln/70">Supplier: {supplier?.name}</span>
+          <span className="min-w-0 break-words text-sm text-kiln/70">Supplier: {supplier?.name}</span>
         </div>
 
         {phase.kind === "error" && (
@@ -165,12 +170,14 @@ export function SupplierChangeForm() {
                   {phase.rows.map((r) => (
                     <li key={r.dish.id} className="sinapis-rise rounded-md bg-kiln/5 p-3 text-sm">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-semibold">{r.dish.name}</span>
+                        <span className="min-w-0 break-words font-semibold" title={r.dish.name}>
+                          {r.dish.name}
+                        </span>
                         <Badge variant={r.before}>{STATUS_WORD[r.before]}</Badge>
                         <ChevronRight className="size-3.5" aria-hidden />
                         <Badge variant={r.after}>{STATUS_WORD[r.after]}</Badge>
                       </div>
-                      <p className="mt-1 text-kiln/70">via {r.via.slice(1).map((s) => s.label).join(" > ")}</p>
+                      <p className="mt-1 break-words text-kiln/70">via {r.via.slice(1).map((s) => s.label).join(" > ")}</p>
                     </li>
                   ))}
                 </ul>

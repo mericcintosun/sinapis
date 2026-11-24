@@ -32,7 +32,7 @@ export function AllergenMatrix({
 }) {
   return (
     <div className="max-w-full overflow-x-auto">
-      <table className="w-full min-w-[47.5rem] border-separate border-spacing-1 text-sm">
+      <table className="w-full min-w-[56rem] border-separate border-spacing-1 text-sm">
         <caption className="sr-only">
           Allergen matrix: C means contains, M means may contain, a question mark means the supplier spec is unknown.
         </caption>
@@ -49,7 +49,7 @@ export function AllergenMatrix({
                   title={a.name}
                   aria-pressed={focus === a.code}
                   onClick={() => onFocus(focus === a.code ? null : a.code)}
-                  className={cn("h-7 w-full border-transparent px-1 text-[11px]", focus === a.code && "bg-kiln text-on-kiln hover:bg-kiln")}
+                  className={cn("h-11 min-h-11 w-full min-w-11 border-transparent px-1 text-[11px]", focus === a.code && "bg-kiln text-on-kiln hover:bg-kiln")}
                 >
                   {a.code}
                 </Button>
@@ -61,7 +61,11 @@ export function AllergenMatrix({
           {dishes.map((d) => (
             <tr key={d.id}>
               <th scope="row" className="pr-2 text-left font-medium">
-                <Link href={`/dishes/${d.id}`} className="underline decoration-kiln/20 underline-offset-4 hover:decoration-kiln">
+                <Link
+                  href={`/dishes/${d.id}`}
+                  title={d.name}
+                  className="inline-flex min-h-11 items-center break-words underline decoration-kiln/20 underline-offset-4 hover:decoration-kiln"
+                >
                   {d.name}
                 </Link>
               </th>
@@ -75,7 +79,7 @@ export function AllergenMatrix({
                       href={`/dishes/${d.id}?allergen=${a.code}`}
                       aria-label={`${d.name} ${c.word} ${a.name}`}
                       className={cn(
-                        "flex h-8 items-center justify-center rounded-md text-xs font-bold",
+                        "flex min-h-11 min-w-11 items-center justify-center rounded-md text-xs font-bold",
                         c.cls,
                         focus && focus !== a.code && "opacity-40",
                         isFresh && "sinapis-rise ring-2 ring-kiln",
