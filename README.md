@@ -81,6 +81,18 @@ RETURN DISTINCT d.name AS dish, sp.name AS unknownProduct;
 
 To expose the same store to an agent over MCP, run `relate serve --mcp --database kitchen/store` (check the subcommand against `relate --help` for your version).
 
+## Prize tracks
+
+This hackathon has no sponsor bounty. All three tracks are main placements, entered automatically, and each one rests on the same Relate code.
+
+| Bounty | Prize | Slots | Required tech | Code file | DEMO step |
+| --- | --- | --- | --- | --- | --- |
+| First place | Mac Studio (M5 Max, 64GB / 1TB) valued at $3,799 | 1 | Relate | `lib/adapter.real.ts` (engine calls through `lib/relate.worker.ts`) | 4, 5, 6 |
+| Second place | Mac mini (M6, 32GB / 512GB) valued at $1,499 | 1 | Relate | `lib/adapter.real.ts` (engine calls through `lib/relate.worker.ts`) | 4, 5, 6 |
+| Third place | Mac mini (M6, 16GB / 256GB) valued at $899 | 1 | Relate | `lib/adapter.real.ts` (engine calls through `lib/relate.worker.ts`) | 4, 5, 6 |
+
+Deleting `lib/adapter.real.ts` and `lib/relate.worker.ts` breaks DEMO steps 2, 4 and 6, because no mirror-free answer remains. Submission steps per track are in `DELIVERY.md`.
+
 ## Tech stack
 
 - Next.js 15 (App Router), React 19, TypeScript strict, Tailwind CSS v4, shadcn-style primitives (Radix Slot, class-variance-authority, clsx, tailwind-merge, lucide-react)
@@ -110,15 +122,15 @@ To run the browser path on Relate instead of the local mirror, copy `.env.exampl
 
 - Tests:
 <!-- PROOF:BEGIN tests -->
-`npm test` on 2026-11-24: 17 passed, 0 failed, exit 0, 0.9 s.
+`npm test` on 2026-11-24: 17 passed, 0 failed, exit 0, 0.7 s.
 <!-- PROOF:END tests -->
 - Relate engine:
 <!-- PROOF:BEGIN relate-engine -->
-`CYPHER.productImpact` for `p-tahini` on @relate/relate-wasm 1.2.0 in Node, in-memory store seeded with 187 statements, on 2026-11-24: 8 rows, 7 distinct dishes, 15.6 ms.
+`CYPHER.productImpact` for `p-tahini` on @relate/relate-wasm 1.2.0 in Node, in-memory store seeded with 187 statements, on 2026-11-24: 8 rows, 7 distinct dishes, 30.7 ms.
 <!-- PROOF:END relate-engine -->
 - Guest check on Relate (Sesame plus Celery):
 <!-- PROOF:BEGIN guest -->
-`CYPHER.guestSafeDishes` and `CYPHER.guestSwap` for Sesame plus Celery on @relate/relate-wasm 1.2.0 in Node, in-memory store seeded with 187 statements, on 2026-11-24: 3 safe dishes (cacik, grilled-sea-bass, zucchini-fritters), 3 safe with one swap (baba-ghanoush, fried-calamari, roast-cauliflower), roasted cauliflower with the garlic yogurt sauce swap: yes, 53.8 ms.
+`CYPHER.guestSafeDishes` and `CYPHER.guestSwap` for Sesame plus Celery on @relate/relate-wasm 1.2.0 in Node, in-memory store seeded with 187 statements, on 2026-11-24: 3 safe dishes (cacik, grilled-sea-bass, zucchini-fritters), 3 safe with one swap (baba-ghanoush, fried-calamari, roast-cauliflower), roasted cauliflower with the garlic yogurt sauce swap: yes, 70.6 ms.
 <!-- PROOF:END guest -->
 - Seed store:
 <!-- PROOF:BEGIN seed-store -->
@@ -134,7 +146,7 @@ To run the browser path on Relate instead of the local mirror, copy `.env.exampl
 - Import a supplier spec sheet PDF and propose the graph change for the chef to confirm.
 - A printable allergen card per dish, with the path printed beside each flag for the inspector.
 - Several sites sharing one supplier graph, so a change at one supplier warns every kitchen that uses it.
-- A graph panel on the dish page that draws the dish subgraph (layout computed with d3, rendered in React) instead of the text path.
+- Draw the suppliers as their own column in the dish path graph, so a supplier with several products shows as one node.
 
 ## Declarations
 
