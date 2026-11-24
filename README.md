@@ -72,7 +72,7 @@ To expose the same store to an agent over MCP, run `relate serve --mcp --store k
 ## Tech stack
 
 - Next.js 15 (App Router), TypeScript strict, Tailwind CSS v4, shadcn-style primitives
-- Relate by Neo4j: `@relate/relate-wasm` in the browser, `relate` CLI for the directory store
+- Relate by Neo4j: `@relate/relate-wasm` in the browser, loaded from `NEXT_PUBLIC_RELATE_WASM_URL` when set (not bundled), `relate` CLI for the directory store
 - Cypher 25 (variable-length paths)
 - d3 (scales and stacks only) and Motion for the allergen load chart
 - Vercel static deploy, no API keys
