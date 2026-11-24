@@ -84,3 +84,5 @@ Rules:
 - every interaction is driven by the real seed data; a decorative animation with no product meaning does not count as a signature
 
 ## Amendments (append-only; later phases add dated lines here, never edit anything above)
+
+- 2026-11-24, Phase 4: kit signature 2 shipped as `components/path-graph.tsx` on `/dishes/[id]`. d3 `scalePoint`, `scaleBand` and `linkHorizontal` do the layout, React renders the SVG, and `motion.path` draws the links with `pathLength`. Hovering or focusing a node rewrites the sentence under the graph. No new package.

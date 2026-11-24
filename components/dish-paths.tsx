@@ -9,6 +9,7 @@ import type { AllergenPath, Engine } from "@/lib/types";
 import { useKitchen, useKitchenAdapter } from "@/components/kitchen-provider";
 import { EngineNote } from "@/components/engine-note";
 import { EmptyState, ErrorState } from "@/components/route-states";
+import { PathGraph } from "@/components/path-graph";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -139,16 +140,39 @@ export function DishPaths({ dishId, focus }: { dishId: string; focus: AllergenCo
             </p>
             <EngineNote engine={state.engine} mode={adapter.mode} />
           </div>
+          {state.paths.length > 0 && (
+            <Card className="sinapis-rise">
+              <CardHeader className="pb-3">
+                <CardTitle>Path graph</CardTitle>
+                <CardDescription className="max-w-[68ch]">
+                  Each line is one step the graph walked, left to right, from the dish to the allergen. Shared sauces
+                  collapse into one node.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <PathGraph paths={state.paths} focus={focus} kitchen={kitchen} />
+              </CardContent>
+            </Card>
+          )}
           {groups.length === 0 ? (
-            <PathsEmptyState title="No path reaches a declared allergen or an unknown spec" hint="Nothing to flag on this dish." />
+            <PathsEmptyState
+              title="No path reaches a declared allergen or an unknown spec"
+              hint="Every supplier product on this dish has a spec sheet and none declares one of the 14 allergens. If a supplier sends a new declaration, log it in the change log and the paths appear here."
+            />
           ) : (
             focus &&
-            !groups.some(([key]) => key === focus) && (
+            !groups.some(([key]) => key === focus) &&
+            (matrix[dishId][focus] === "unknown" ? (
+              <PathsEmptyState
+                title={`No declared path to ${kitchen.allergens.find((a) => a.code === focus)?.name ?? focus}, but not cleared`}
+                hint="A product on this dish has no spec sheet on file, so the cell stays unknown until the supplier sends one. That path is listed under Unknown spec below."
+              />
+            ) : (
               <PathsEmptyState
                 title={`No path to ${kitchen.allergens.find((a) => a.code === focus)?.name ?? focus}`}
                 hint="This cell is clear: no supplier product on any path declares it. The other flags of this dish are listed below."
               />
-            )
+            ))
           )}
           <div className="sinapis-rise-group space-y-4">
             {groups.map(([key, paths]) => {
@@ -168,8 +192,9 @@ export function DishPaths({ dishId, focus }: { dishId: string; focus: AllergenCo
                           <li key={`${s.id}-${j}`} className="flex items-center gap-1.5">
                             {j > 0 && <ChevronRight className="size-3.5 text-kiln/40" aria-hidden />}
                             <span
+                              title={s.label}
                               className={cn(
-                                "rounded-md px-2 py-1",
+                                "max-w-full break-words rounded-md px-2 py-1",
                                 s.kind === "Allergen" ? (p.status === "contains" ? "bg-bad" : "bg-warn") : "bg-kiln/5",
                               )}
                             >

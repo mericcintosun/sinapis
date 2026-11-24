@@ -20,6 +20,7 @@ Seed ids used below (checked against `data/kitchen.json`): dish `grilled-sea-bas
 4. **Preview, then Apply.** "Preview impact" lists the 7 reached dishes, each with its sauce path (for example Lamb shish > Tahini lemon sauce > Tahini > Stone-ground tahini). Click "Apply to the kitchen graph" (file `components/supplier-change-form.tsx`).
 5. **Cells turn red.** Back on `/` (file `app/page.tsx`), the Peanuts column now shows the 7 changed cells, ringed as fresh, and the chart re-stacks.
 6. **Guest check, then the store.** On `/dishes` (file `app/dishes/page.tsx`), pick Sesame and Celery. The safe list appears, plus "Roasted cauliflower: garlic yogurt sauce instead of tahini lemon sauce" under "Safe with one swap". Then, in a terminal, run query 2 from the README against the store built by `npm run seed` (`kitchen/store`, replayed from `kitchen/seed.cypher`). It lists the same 7 dishes the preview showed.
+7. **Path graph.** Route `/dishes/[id]` (file `app/dishes/[id]/page.tsx`, component `components/path-graph.tsx`). After step 5, click the Lamb shish row's Peanuts cell on `/`. It opens `/dishes/lamb-shish?allergen=PNT`, and the graph draws Lamb shish > Tahini lemon sauce > Tahini > Stone-ground tahini (Antep Tahin Evi) > Peanuts left to right, with the Peanuts node on the "may contain" fill. Hover or tab to a node and the sentence under the graph reads it back, for example "Stone-ground tahini, 2 kg tin (Antep Tahin Evi) reaches Peanuts on 1 of this dish's N paths", where N is the dish's path count. The same read-back works on the step 2 cell, `/dishes/grilled-sea-bass?allergen=MUS`, where the chain ends on Mustard with the "contains" fill.
 
 ## What runs where
 
@@ -27,9 +28,10 @@ Seed ids used below (checked against `data/kitchen.json`): dish `grilled-sea-bas
 - Every answer carries a note that says which engine produced it: "Live engine: Relate (WASM, stored in this browser with OPFS)." or "Sample data: answered by the local graph mirror, not by Relate."
 - The matrix on `/` (step 1) is drawn from the mirror in both modes, by replaying the applied changes on the seed, so it renders in server HTML. Its note says so.
 - Query 2 at the end of step 6 runs in the `relate` CLI against `kitchen/store`.
+- Step 7 draws the same paths the step 2 query returned (`getDishPaths` in `lib/adapter.real.ts`). The graph adds no query: d3 computes the layout and React renders it in the browser.
 
 ## Reset between cycles
 
-Open `/?reset=1` (or press "Reset to seed" on the overview) before each cycle. It clears the supplier changes stored in this browser (`localStorage`, through `lib/store.ts`) and, in real mode, wipes and re-seeds the OPFS store. The server holds no state. `npm run demo:reset` rebuilds the seed files and prints the reset URL and this walk list. Walk steps 1 to 6 three times in a row: the results must be identical and no step may take over 5 seconds.
+Open `/?reset=1` (or press "Reset to seed" on the overview) before each cycle. It clears the supplier changes stored in this browser (`localStorage`, through `lib/store.ts`) and, in real mode, wipes and re-seeds the OPFS store. The server holds no state. `npm run demo:reset` rebuilds the seed files and prints the reset URL and this walk list. Walk steps 1 to 7 three times in a row: the results must be identical and no step may take over 5 seconds.
 
 Sinapis is decision support, not a medical guarantee.
