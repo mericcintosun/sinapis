@@ -51,7 +51,7 @@ export function AppRail() {
           <Link href="/activity#log-change">Log supplier change</Link>
         </Button>
         <p className="hidden text-xs leading-relaxed text-ink/75 md:block">
-          Decision support for the chef. It never treats a missing spec sheet as allergen free.
+          Decision support, not a medical guarantee. A missing spec sheet is never treated as allergen free.
         </p>
       </div>
     </header>

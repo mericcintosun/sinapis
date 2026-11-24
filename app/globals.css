@@ -76,6 +76,25 @@
 
   --font-display: var(--font-dm-serif), "Iowan Old Style", "Palatino Linotype", Georgia, serif;
   --font-sans: var(--font-dm-sans), "Helvetica Neue", Arial, sans-serif;
+
+  /* Spacing: the 0.25rem base step, plus the shell measures. */
+  --spacing: 0.25rem;
+  --spacing-rail: 16rem;
+  --spacing-pane: 72rem;
+
+  /* Type scale: serif headlines on the block, DM Sans body on the cards. */
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1.1rem;
+  --text-body: 1rem;
+  --text-body--line-height: 1.6rem;
+  --text-lead: 1.125rem;
+  --text-lead--line-height: 1.8rem;
+  --text-title: 1.875rem;
+  --text-title--line-height: 2.25rem;
+  --text-headline: 2.25rem;
+  --text-headline--line-height: 2.6rem;
+  --text-display: 3rem;
+  --text-display--line-height: 3.25rem;
 }
 
 html {
@@ -85,6 +104,13 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
+}
+
+/* Visible keyboard focus everywhere. Kiln-black reads on both the terracotta block and the cream cards.
+   Buttons replace it with their own ring. */
+:focus-visible {
+  outline: 2px solid var(--kiln);
+  outline-offset: 2px;
 }
 
 h1,

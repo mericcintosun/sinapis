@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import { OverviewBoard } from "@/components/overview-board";
 import { SceneSlot } from "@/components/scene-slot";
 import { seedKitchen } from "@/lib/data";
+
+export const metadata: Metadata = { title: "Overview" };
 
 // Overview: the app shell's welcome state, built from the seed. No marketing hero;
 // the rail holds the only call to action (Log supplier change).

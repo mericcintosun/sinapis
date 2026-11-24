@@ -18,7 +18,7 @@ const body = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: { default: "Sinapis: the allergen graph for a restaurant kitchen", template: "%s · Sinapis" },
+  title: { default: "Sinapis: the allergen graph for a restaurant kitchen", template: "%s | Sinapis" },
   description:
     "Sinapis traces every allergen on your menu back through the sauce and the supplier product it came from, and tells you which dishes change the moment a supplier changes a recipe.",
 };
@@ -30,7 +30,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <KitchenProvider>
           <div className="md:flex">
             <AppRail />
-            <main className="min-w-0 flex-1 px-4 pb-28 pt-6 md:px-10 md:pb-12 md:pt-10">{children}</main>
+            <main className="min-w-0 flex-1 px-4 pb-28 pt-6 md:px-10 md:pb-12 md:pt-10">
+              {children}
+              <p className="mx-auto mt-12 max-w-6xl text-xs text-ink/75 md:hidden">
+                Decision support, not a medical guarantee. A missing spec sheet is never treated as allergen free.
+              </p>
+            </main>
           </div>
         </KitchenProvider>
       </body>
