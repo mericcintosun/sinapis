@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { BRAND } from "@/lib/brand-colors";
 
-export const alt = "Sinapis: the allergen graph for a restaurant kitchen";
+export const alt = "Sinapis: allergens traced to the supplier";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -17,7 +17,7 @@ export default function OpengraphImage() {
           <div style={{ fontSize: 84, fontFamily: "serif" }}>Sinapis</div>
         </div>
         <div style={{ display: "flex", fontSize: 46, lineHeight: 1.25, maxWidth: 1000 }}>
-          Every allergen on the menu, traced to the sauce and the supplier product it came from.
+          Allergens traced to the supplier: every flag on the menu, through the sauce to the product it came from.
         </div>
         <div style={{ display: "flex", gap: 16 }}>
           <div style={{ background: BRAND.bad, color: BRAND.kiln, padding: "10px 20px", borderRadius: 6, fontSize: 28 }}>contains</div>

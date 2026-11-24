@@ -22,7 +22,7 @@ function MatrixEmptyState({ resetting }: { resetting: boolean }) {
       hint={
         resetting
           ? "Clearing the supplier changes stored in this browser and the engine copy. The matrix comes back in a moment."
-          : "Once dishes are seeded, every allergen path shows here. Start from a supplier change."
+          : "Each dish appears here as one row of 14 allergen cells. Open /?reset=1 to load the seed menu again, then log a supplier change to see cells turn red."
       }
       action={
         <Button asChild size="sm" variant="quiet">
@@ -88,7 +88,7 @@ export function OverviewBoard() {
         </Card>
       )}
 
-      <Card className="sinapis-rise">
+      <Card id="matrix" className="sinapis-rise scroll-mt-24">
         <CardHeader>
           <CardTitle>Allergen matrix</CardTitle>
           <CardDescription className="max-w-[68ch]">

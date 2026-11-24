@@ -158,6 +158,7 @@ export function DishBrowser() {
               filtered ? (
                 <EmptyState
                   title="No dish matches this search and section"
+                  hint={`Dishes whose English or Turkish name contains the search text show here. Clear the filters to see all ${kitchen.dishes.length}.`}
                   action={
                     <Button size="sm" variant="quiet" onClick={clearFilters}>
                       Clear filters
@@ -183,6 +184,11 @@ export function DishBrowser() {
             empty={
               <EmptyState
                 title={guest.length ? "No single substitution clears another dish" : "Pick a guest allergen to see swaps"}
+                hint={
+                  guest.length
+                    ? "A dish shows here when swapping one sauce removes every path to the picked allergens."
+                    : "Tap an allergen above, for example Sesame and Celery. Dishes that clear with one sauce swap appear here."
+                }
               />
             }
           >
@@ -193,7 +199,14 @@ export function DishBrowser() {
           <DishColumn
             title="Not for this guest"
             empty={
-              <EmptyState title={guest.length ? "Nothing is off the table" : "Pick a guest allergen to see conflicts"} />
+              <EmptyState
+                title={guest.length ? "Nothing is off the table" : "Pick a guest allergen to see conflicts"}
+                hint={
+                  guest.length
+                    ? "No dish has a path to the picked allergens or to a product with no spec sheet."
+                    : "Tap an allergen above. Dishes with a path to it appear here, with the first step of that path."
+                }
+              />
             }
           >
             {unsafe.map(({ dish, reasons }) => {
@@ -271,12 +284,18 @@ function DishRow({ dish, note, badge }: { dish: Dish; note: string; badge?: "fre
     <li className="sinapis-rise">
       <Link href={`/dishes/${dish.id}`} className="block rounded-md bg-card p-4 text-card-foreground hover:bg-bad/40">
         <div className="flex items-baseline justify-between gap-3">
-          <span className="font-semibold">{dish.name}</span>
-          <span className="text-sm text-kiln/60">{dish.price} TL</span>
+          <span className="min-w-0 break-words font-semibold" title={dish.name}>
+            {dish.name}
+          </span>
+          <span className="shrink-0 text-sm text-kiln/60">{dish.price} TL</span>
         </div>
         <div className="mt-1 flex items-center gap-2 text-sm text-kiln/75">
-          {badge && <Badge variant={badge}>{badge === "free" ? "safe" : badge === "may" ? "swap" : badge}</Badge>}
-          <span>{note}</span>
+          {badge && (
+            <Badge variant={badge} className="shrink-0">
+              {badge === "free" ? "safe" : badge === "may" ? "swap" : badge}
+            </Badge>
+          )}
+          <span className="min-w-0 break-words">{note}</span>
         </div>
       </Link>
     </li>

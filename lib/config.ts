@@ -22,6 +22,14 @@ function readWasmUrl(): string | undefined {
   }
 }
 
+function readSiteUrl(): string | undefined {
+  try {
+    return process.env.NEXT_PUBLIC_SITE_URL || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function readBrandFiles(): string {
   try {
     return process.env.NEXT_PUBLIC_BRAND_FILES ?? "";
@@ -59,6 +67,9 @@ export const RELATE_BUDGET_MS = 4800;
 
 /** Prefix of every core-path log line. Logs carry ids, counts and durations only. */
 export const LOG_PREFIX = "[core]";
+
+/** Public origin for absolute metadata URLs (og:image, twitter:image). Not a secret. */
+export const SITE_URL: string = readSiteUrl() ?? "https://sinapis-nine.vercel.app";
 
 /** Comma separated uploaded brand image names, written by next.config.ts at build time. */
 export const BRAND_FILES: string = readBrandFiles();

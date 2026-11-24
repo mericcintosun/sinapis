@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { DM_Sans, DM_Serif_Display } from "next/font/google";
 import { AppRail } from "@/components/app-rail";
 import { KitchenProvider } from "@/components/kitchen-provider";
+import { SITE_URL } from "@/lib/config";
 import "./globals.css";
 
 const display = DM_Serif_Display({
@@ -17,10 +18,26 @@ const body = DM_Sans({
   variable: "--font-dm-sans",
 });
 
+// Title claim (five words) matches the claim line in app/opengraph-image.tsx.
+const TITLE = "Sinapis: allergens traced to the supplier";
+// 145 characters: the problem, then the fix.
+const DESCRIPTION =
+  "Supplier recipe changes hide allergens in nested sauces. Sinapis traces every flag to its product and lists the reached dishes before you accept.";
+
+function siteBase(): URL {
+  try {
+    return new URL(SITE_URL);
+  } catch {
+    return new URL("https://sinapis-nine.vercel.app");
+  }
+}
+
 export const metadata: Metadata = {
-  title: { default: "Sinapis: the allergen graph for a restaurant kitchen", template: "%s | Sinapis" },
-  description:
-    "Sinapis traces every allergen on your menu back through the sauce and the supplier product it came from, and tells you which dishes change the moment a supplier changes a recipe.",
+  metadataBase: siteBase(),
+  title: { default: TITLE, template: "%s | Sinapis" },
+  description: DESCRIPTION,
+  openGraph: { title: TITLE, description: DESCRIPTION, type: "website", siteName: "Sinapis" },
+  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
