@@ -1,8 +1,16 @@
 // Pure Relate pieces: the Cypher the app asks, the seed statements, the Engine label
 // and helpers that turn Relate rows into the app's path types. Nothing here opens a
 // database; only the dedicated Relate worker does that, one call at a time.
-import type { AllergenCode, Kitchen } from "@/lib/data";
-import { dishPaths, stepFor, type AllergenPath, type GuestAnswer, type PathStep } from "@/lib/kitchen-graph";
+import { ALLERGEN_CODES, type AllergenCode, type Kitchen } from "@/lib/data";
+import {
+  dishPaths,
+  stepFor,
+  type AllergenPath,
+  type CellStatus,
+  type GuestAnswer,
+  type Matrix,
+  type PathStep,
+} from "@/lib/kitchen-graph";
 
 export type Engine = "relate-wasm" | "local-mirror";
 
@@ -52,6 +60,12 @@ WITH d, s, sp2, collect(a2.code) AS codes2
 WITH d, s, sum(CASE WHEN sp2 IS NOT NULL AND (sp2.specKnown = false OR any(c IN codes2 WHERE c IN $codes)) THEN 1 ELSE 0 END) AS dirty
 WHERE dirty = 0
 RETURN d.id AS dish, s.from AS swapFrom, s.to AS swapTo`,
+  /** Overview matrix: every declared allergen each dish reaches, one row per dish and allergen. */
+  matrixDeclared: `MATCH (d:Dish)-[:USES*1..6]->(:Ingredient)-[:SUPPLIED_AS]->(:SupplierProduct)-[r:CONTAINS|MAY_CONTAIN]->(a:Allergen)
+RETURN DISTINCT d.id AS dish, a.code AS allergen, type(r) AS rel`,
+  /** Overview matrix: dishes that reach a product with no spec sheet (every cell unknown at least). */
+  matrixUnknown: `MATCH (d:Dish)-[:USES*1..6]->(:Ingredient)-[:SUPPLIED_AS]->(:SupplierProduct {specKnown: false})
+RETURN DISTINCT d.id AS dish`,
   /** Written last by the worker after a full seed; a store without it is re-seeded. */
   seedMarkCount: `MATCH (m:SeedMark) RETURN count(m) AS n`,
   seedMarkCreate: `CREATE (:SeedMark {version: 1})`,
@@ -133,6 +147,31 @@ export function rowsToGuest(k: Kitchen, codes: AllergenCode[], safeRows: Row[], 
   }
   return answer;
 }
+
+/**
+ * Rows of CYPHER.matrixDeclared and CYPHER.matrixUnknown as a Matrix, with the same rule as
+ * statusFromPaths in the mirror: contains beats may contain, may contain beats unknown, and
+ * a dish that reaches a product with no spec sheet is unknown for every allergen it does
+ * not reach through a declaration.
+ */
+export function rowsToMatrix(k: Kitchen, declared: Row[], unknown: Row[]): Matrix {
+  const unknownDishes = new Set(unknown.map((r) => String(r.dish)));
+  const m: Matrix = {};
+  for (const d of k.dishes) {
+    const base: CellStatus = unknownDishes.has(d.id) ? "unknown" : "free";
+    m[d.id] = Object.fromEntries(ALLERGEN_CODES.map((c) => [c, base])) as Record<AllergenCode, CellStatus>;
+  }
+  for (const r of declared) {
+    const row = m[String(r.dish)];
+    const code = String(r.allergen) as AllergenCode;
+    if (!row || !(code in row)) continue;
+    const status: CellStatus = r.rel === "CONTAINS" ? "contains" : "may";
+    if (CELL_RANK[status] > CELL_RANK[row[code]]) row[code] = status;
+  }
+  return m;
+}
+
+const CELL_RANK: Record<CellStatus, number> = { contains: 3, may: 2, unknown: 1, free: 0 };
 
 /** Rows of CYPHER.productImpact: the first path per reached dish. */
 export function reachedDishes(k: Kitchen, rows: Row[]): Map<string, PathStep[]> {

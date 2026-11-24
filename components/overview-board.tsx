@@ -36,7 +36,7 @@ function MatrixEmptyState({ resetting }: { resetting: boolean }) {
 // The overview pane: chart and matrix share one focus allergen, so clicking a bar
 // or a column header narrows both to the same question.
 export function OverviewBoard() {
-  const { kitchen, matrix, fresh, log, reset, resetting } = useKitchen();
+  const { kitchen, matrix, matrixEngine, fresh, log, reset, resetting } = useKitchen();
   const adapter = useKitchenAdapter();
   const [focus, setFocus] = React.useState<AllergenCode | null>(null);
   const rows = React.useMemo(() => allergenLoad(kitchen, matrix), [kitchen, matrix]);
@@ -98,7 +98,7 @@ export function OverviewBoard() {
         </div>
         <Card>
           <CardHeader className="pb-3">
-            <EngineNote engine={adapter.matrixEngine} mode={adapter.mode} />
+            <EngineNote engine={matrixEngine} mode={adapter.mode} />
           </CardHeader>
           <CardContent className="px-2 sm:px-5">
             {resetting || kitchen.dishes.length === 0 ? (

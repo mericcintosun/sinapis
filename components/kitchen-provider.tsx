@@ -9,6 +9,8 @@ import type { Engine, Matrix, SpecChange } from "@/lib/types";
 interface KitchenContextValue {
   kitchen: Kitchen;
   matrix: Matrix;
+  /** Who answered `matrix`; "pending" while Relate is still opening in this browser. */
+  matrixEngine: MatrixEngine;
   log: ChangeEntry[];
   /** "dishId:ALLERGEN" keys that changed in the latest apply; the matrix animates them. */
   fresh: Set<string>;
@@ -18,11 +20,12 @@ interface KitchenContextValue {
   reset: () => Promise<Engine>;
 }
 
+export type MatrixEngine = Engine | "pending";
+
 const KitchenContext = React.createContext<KitchenContextValue | null>(null);
 // Browser state lives behind lib/store.ts (browser storage replay). With ADAPTER_MODE=real the
 // Relate graph also persists in OPFS (opfs://sinapis-kitchen); reset clears both.
 const adapter = getAdapter();
-const PREWARM_DISH = "grilled-sea-bass";
 
 export function KitchenProvider({ children }: { children: React.ReactNode }) {
   const [applied, setApplied] = React.useState<AppliedChange[]>([]);
@@ -40,7 +43,32 @@ export function KitchenProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const kitchen = React.useMemo(() => adapter.replay(applied), [applied]);
-  const matrix = React.useMemo(() => adapter.matrixOf(kitchen), [kitchen]);
+  const mirrorMatrix = React.useMemo(() => adapter.matrixOf(kitchen), [kitchen]);
+  // Bumped after a write lands in the engine store, so the matrix is asked again even when
+  // the kitchen did not change (a repeated change). A reset re-asks when `resetting` ends.
+  const [storeVersion, setStoreVersion] = React.useState(0);
+  // The engine's matrix answer, kept with the kitchen it was asked for: an answer for an
+  // older kitchen is never shown next to a newer one.
+  const [answer, setAnswer] = React.useState<{ kitchen: Kitchen; engine: Engine; matrix: Matrix } | null>(null);
+  const current = answer && answer.kitchen === kitchen ? answer : null;
+  const matrix = current ? current.matrix : mirrorMatrix;
+  const matrixEngine: MatrixEngine = current ? current.engine : adapter.mode === "real" ? "pending" : adapter.matrixEngine;
+
+  React.useEffect(() => {
+    if (resetting) return;
+    let live = true;
+    adapter
+      .getMatrix(kitchen)
+      .then((a) => {
+        if (live) setAnswer({ kitchen, engine: a.engine, matrix: a.data });
+      })
+      .catch(() => {
+        if (live) setAnswer({ kitchen, engine: "local-mirror", matrix: adapter.matrixOf(kitchen) });
+      });
+    return () => {
+      live = false;
+    };
+  }, [kitchen, storeVersion, resetting]);
   const log = React.useMemo(
     () => [...applied.map((a) => a.entry).reverse(), ...seedKitchen.history],
     [applied],
@@ -76,6 +104,7 @@ export function KitchenProvider({ children }: { children: React.ReactNode }) {
           saveApplied(next);
         }
         setFresh(new Set(affectedDishIds.map((d) => `${d}:${change.allergen}`)));
+        setStoreVersion((v) => v + 1);
         return engine;
       })();
       inFlight.current = { key, promise };
@@ -99,8 +128,8 @@ export function KitchenProvider({ children }: { children: React.ReactNode }) {
   }, [commitApplied]);
 
   // One mount effect: either the operator asked for a reset with /?reset=1, or the stored
-  // changes are loaded. In real mode it also warms the Relate worker (module download,
-  // OPFS open) with one path query, so step 2 does not pay for the init.
+  // changes are loaded. In real mode the matrix effect above is the first Relate call, so
+  // it also warms the worker (module download, OPFS open) before step 2.
   React.useEffect(() => {
     if (booted.current) return;
     booted.current = true;
@@ -113,14 +142,11 @@ export function KitchenProvider({ children }: { children: React.ReactNode }) {
     } else {
       commitApplied(loadApplied());
     }
-    if (adapter.mode === "real") {
-      adapter.getDishPaths(PREWARM_DISH).catch(() => undefined);
-    }
   }, [reset, commitApplied]);
 
   const value = React.useMemo(
-    () => ({ kitchen, matrix, log, fresh, resetting, apply, reset }),
-    [kitchen, matrix, log, fresh, resetting, apply, reset],
+    () => ({ kitchen, matrix, matrixEngine, log, fresh, resetting, apply, reset }),
+    [kitchen, matrix, matrixEngine, log, fresh, resetting, apply, reset],
   );
   return <KitchenContext.Provider value={value}>{children}</KitchenContext.Provider>;
 }
