@@ -105,6 +105,14 @@ Unverified here (no shell): build, tests, and that the crawl sees "Live engine" 
 
 Unverified here (no shell): build, and that the crawl now sees "Live engine" on a dish page (a crawl that screenshots before the WASM open ends will see "Asking Relate", which is honest).
 
+## QA round 3 (live crawl, 2026-11-24)
+
+| Finding | Root cause | Fix |
+| --- | --- | --- |
+| proof: `npm test` 17 passed, 0 failed, exit 0 | not a failure | none |
+
+Observation, not a crawl finding: the round 3 screenshots of `/dishes/[id]` still show "Local mirror" after the round 2 fix shipped. Since `askRelate` (`lib/adapter.ts`) now only shows that note when `relateReady()` resolves false, the crawler's headless browser either failed the open or hit `WORKER_OPEN_MAX_MS` (30 s). Its console warn `[sinapis] relate open failed <code> <ms>` (`lib/relate-client.ts`) will tell you which: `not_configured` is the module or WASM instantiation, `upstream_error` is the OPFS open, `upstream_timeout` is the 7.2 MB download. The note is already calm and true, so no code changed in this pass. Check it in a normal browser before deciding whether it needs work.
+
 ## QA: external findings
 
 None. Every finding so far had its cause inside this repo.
