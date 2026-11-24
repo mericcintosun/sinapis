@@ -1,15 +1,56 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ChevronRight } from "lucide-react";
-import type { AllergenCode } from "@/lib/data";
+import { ALLERGEN_CODES, type AllergenCode } from "@/lib/data";
 import type { AllergenPath, Engine } from "@/lib/types";
 import { useKitchen, useKitchenAdapter } from "@/components/kitchen-provider";
 import { EngineNote } from "@/components/engine-note";
+import { EmptyState, ErrorState } from "@/components/route-states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+
+/** Placeholder while the path query runs (also the Suspense fallback on /dishes/[id]). */
+export function DishPathsSkeleton() {
+  return (
+    <div role="status" aria-live="polite" className="space-y-3 rounded-md bg-card p-5">
+      <span className="sr-only">Walking the graph from this dish to every allergen</span>
+      <Skeleton className="h-6 w-56 max-w-full" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-4 w-4/5" />
+      <Skeleton className="h-16 w-full" />
+    </div>
+  );
+}
+
+function PathsEmptyState({ title, hint }: { title: string; hint: string }) {
+  return (
+    <EmptyState
+      title={title}
+      hint={hint}
+      action={
+        <Button asChild size="sm" variant="quiet">
+          <Link href="/">Back to the matrix</Link>
+        </Button>
+      }
+    />
+  );
+}
+
+/**
+ * Reads ?allergen= on the client, so the 16 dish pages stay static. Render it under a
+ * Suspense boundary (useSearchParams).
+ */
+export function DishPathsFromQuery({ dishId }: { dishId: string }) {
+  const allergen = useSearchParams().get("allergen");
+  const focus = ALLERGEN_CODES.includes(allergen as AllergenCode) ? (allergen as AllergenCode) : null;
+  return <DishPaths dishId={dishId} focus={focus} />;
+}
 
 type State =
   | { kind: "loading" }
@@ -79,21 +120,15 @@ export function DishPaths({ dishId, focus }: { dishId: string; focus: AllergenCo
         </CardContent>
       </Card>
 
-      {state.kind === "loading" && (
-        <Card>
-          <CardContent className="p-5 text-sm text-kiln/75">Walking the graph from this dish to every allergen.</CardContent>
-        </Card>
-      )}
+      {state.kind === "loading" && <DishPathsSkeleton />}
 
       {state.kind === "error" && (
-        <Card>
-          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
-            <span className="text-sm">The path query failed: {state.message}</span>
-            <Button variant="quiet" size="sm" onClick={() => setAttempt((n) => n + 1)}>
-              Run it again
-            </Button>
-          </CardContent>
-        </Card>
+        <ErrorState
+          title="The path query failed"
+          hint={`${state.message}. Nothing was written. Try again to ask the graph for the same dish.`}
+          retryLabel="Run it again"
+          onRetry={() => setAttempt((n) => n + 1)}
+        />
       )}
 
       {state.kind === "ready" && (
@@ -104,10 +139,16 @@ export function DishPaths({ dishId, focus }: { dishId: string; focus: AllergenCo
             </p>
             <EngineNote engine={state.engine} mode={adapter.mode} />
           </div>
-          {groups.length === 0 && (
-            <Card>
-              <CardContent className="p-5">No path reaches a declared allergen or an unknown spec. Nothing to flag.</CardContent>
-            </Card>
+          {groups.length === 0 ? (
+            <PathsEmptyState title="No path reaches a declared allergen or an unknown spec" hint="Nothing to flag on this dish." />
+          ) : (
+            focus &&
+            !groups.some(([key]) => key === focus) && (
+              <PathsEmptyState
+                title={`No path to ${kitchen.allergens.find((a) => a.code === focus)?.name ?? focus}`}
+                hint="This cell is clear: no supplier product on any path declares it. The other flags of this dish are listed below."
+              />
+            )
           )}
           <div className="sinapis-rise-group space-y-4">
             {groups.map(([key, paths]) => {

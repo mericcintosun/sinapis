@@ -2,25 +2,31 @@
 
 import Link from "next/link";
 import { useKitchen } from "@/components/kitchen-provider";
+import { EmptyState } from "@/components/route-states";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const KIND_WORD = { contains: "now contains", may: "may now contain", clear: "no longer declares", unknown: "spec unknown" } as const;
 
+function ChangeLogEmptyState() {
+  return (
+    <EmptyState
+      title="No supplier changes logged yet"
+      hint="When a supplier emails a new declaration, enter it in the supplier change form and preview the dishes it reaches."
+      action={
+        <Button asChild size="sm" variant="quiet">
+          <Link href="/activity#log-change">Log a change</Link>
+        </Button>
+      }
+    />
+  );
+}
+
 // History of supplier changes: seeded entries plus anything applied in this browser.
 export function ChangeLog() {
   const { kitchen, log } = useKitchen();
-  if (log.length === 0) {
-    return (
-      <p className="rounded-md border border-dashed border-line p-4 text-ink/85">
-        No supplier changes logged yet. When a supplier emails a new declaration, enter it in the{" "}
-        <Link href="#log-change" className="underline decoration-line underline-offset-4 hover:decoration-ink">
-          supplier change form
-        </Link>{" "}
-        above.
-      </p>
-    );
-  }
+  if (log.length === 0) return <ChangeLogEmptyState />;
   return (
     <ol className="sinapis-rise-group space-y-3">
       {log.map((e) => {
