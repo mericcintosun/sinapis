@@ -1,8 +1,24 @@
 # Sinapis
 
-An allergen graph for a restaurant kitchen. Sinapis shows which sauce and which supplier product put each allergen on each dish, and when a supplier changes a recipe it lists the affected dishes before you accept the change.
+Sinapis is an allergen graph for a restaurant kitchen: it shows which sauce and which supplier product put each allergen on each dish. When a supplier changes a recipe, it lists every affected dish with its path before the chef accepts the change, because one quiet spec change in a nested sauce is how allergen mistakes reach a plate.
 
-> Live demo: https://sinapis-nine.vercel.app
+**Live demo: https://sinapis-nine.vercel.app** Start on the overview (DEMO.md step 1), then click "Log supplier change" in the rail (steps 3 and 4).
+
+## Try it in 60 seconds
+
+1. Open https://sinapis-nine.vercel.app. The overview shows the allergen load chart and the matrix: 16 dishes by the 14 EU allergens for Meyhane Lodos. Switch the chart between "Per allergen" and "Cumulative".
+2. Click the Grilled sea bass by Mustard cell. The path reads Grilled sea bass > Green herb sauce > Ready-made mayonnaise > Catering mayonnaise, 5 L (Metro Wholesale Kadıköy) > Mustard.
+3. Click "Log supplier change" in the rail. Pick "Stone-ground tahini, 2 kg tin", "Peanuts", "May contain", then "Preview impact". Seven dishes are listed, each with its sauce path.
+4. Click "Apply to the kitchen graph", go back to the overview, and see the Peanuts column turn red in 7 cells.
+5. Click the Lamb shish by Peanuts cell. The path graph draws the chain left to right; hover or tab to a node and the sentence under the graph reads it back.
+
+Open `/?reset=1` to return the browser to the seed. The full walk, with the guest check, is in `DEMO.md`.
+
+## Addresses
+
+| What | Address |
+| --- | --- |
+| Live web app | https://sinapis-nine.vercel.app |
 
 ## The problem
 
@@ -19,7 +35,7 @@ Sinapis models the kitchen as a graph:
                                                                      (:SupplierProduct)-[:SUPPLIED_BY]->(:Supplier)
 ```
 
-Every flag in the matrix is a path returned by a variable-length Cypher query. Click a cell and you see the chain behind it: *Grilled sea bass > Green herb sauce > Ready-made mayonnaise > Catering mayonnaise, 5 L (Metro Wholesale) > Mustard*.
+Every flag in the matrix is a path returned by a variable-length Cypher query. Click a cell and you see the chain behind it.
 
 Three things a chef can do on day one:
 
@@ -27,7 +43,30 @@ Three things a chef can do on day one:
 2. **Log a supplier change.** Pick the product, the allergen and the new declaration. Sinapis walks the graph backwards from that product, lists every dish it reaches with the path, and writes to the graph only after the chef confirms. The changed cells light up in the matrix.
 3. **Answer a guest.** On the Dishes page, pick the guest's allergens (sesame and celery, say). You get the dishes that are clear, and the dishes that would be clear if the kitchen swapped one sauce ("Roasted cauliflower: garlic yogurt sauce instead of tahini lemon sauce").
 
-A product with no spec sheet on file is **unknown**, never **free**, and that state travels along every path it sits on. Sinapis supports the chef's decision. It is not a medical guarantee.
+A product with no spec sheet on file is **unknown**, never **free**, and that state travels along every path it sits on. Sinapis is decision support, not a medical guarantee.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph Browser
+    R["Next.js routes<br/>/, /dishes, /dishes/[id], /activity"] --> A["lib/adapter.ts<br/>getAdapter()"]
+    A -->|ADAPTER_MODE=real| AR["lib/adapter.real.ts"]
+    A -->|ADAPTER_MODE=fake| AF["lib/adapter.fake.ts"]
+    AR --> RC["lib/relate-client.ts"]
+    RC --> W["lib/relate.worker.ts<br/>one promise queue"]
+    W --> WASM["@relate/relate-wasm<br/>opfs://sinapis-kitchen"]
+    AR -. fallback inside 5 s .-> M["lib/kitchen-graph.ts<br/>local graph mirror"]
+    AF --> M
+  end
+  S["data/kitchen.json<br/>seed"] --> M
+  S --> W
+  S --> SS["scripts/seed-store.mjs"]
+  SS --> K["kitchen/<br/>seed.cypher and the JSON directory store"]
+  K --> CLI["relate CLI"]
+```
+
+The matrix on `/` and the API routes under `app/api/` always answer from the mirror. The path list, the impact preview, the write and the guest check answer from Relate when `ADAPTER_MODE=real`.
 
 ## How it uses Relate
 
@@ -45,23 +84,20 @@ Relate is the engine that answers. If you remove the relationships, no cell in t
 
 We use **two modes on purpose**:
 
-- **Directory store with the JSON codec, committed to this repo** (`./kitchen`). Judges can open the persistent store without running the web app, and because the codec is JSON a change in the seed shows up as a readable git diff. `npm run seed` rebuilds it from `data/kitchen.json`.
+- **Directory store with the JSON codec** (`./kitchen/store`). Judges can open the persistent store without running the web app, and because the codec is JSON a change in the seed shows up as a readable git diff. `npm run seed` writes `kitchen/seed.cypher` from `data/kitchen.json` and builds the store when the `relate` CLI is on PATH (the proof block below says whether this build did).
 - **WebAssembly in the browser with OPFS persistence** (`opfs://sinapis-kitchen`). The live demo needs no server and no API key. The chef's accepted changes survive a reload, and a judge opening the link runs the same engine we do.
 
 In-memory mode is not used for the store. It would leave nothing for a judge to inspect.
 
-With `ADAPTER_MODE=real`, the browser starts one dedicated module worker (`lib/relate.worker.ts`) that loads `@relate/relate-wasm`, runs its `init()`, opens `opfs://sinapis-kitchen` with `RelateDb.open` and seeds it from `data/kitchen.json` when the seed marker is missing. Every statement goes through `db.execute(query, paramsJson)` inside one promise queue, because the WASM build rejects re-entrant calls. The page talks to the worker through `lib/relate-client.ts`. The dish path list, the impact preview, the write and the guest check (safe dishes and one-swap dishes) run on Relate. If the worker cannot load or does not answer, the same question is answered by `lib/kitchen-graph.ts`, a local mirror of the same patterns, and the note under the answer says "Sample data: answered by the local graph mirror, not by Relate." With the default `ADAPTER_MODE=fake`, everything answers from the mirror and says so. The matrix itself and the API routes always answer from the mirror.
+With `ADAPTER_MODE=real`, the browser starts one dedicated module worker (`lib/relate.worker.ts`) that loads `@relate/relate-wasm`, runs its `init()`, opens `opfs://sinapis-kitchen` with `RelateDb.open` and seeds it from `data/kitchen.json` when the seed marker is missing. Every statement goes through `db.execute(query, paramsJson)` inside one promise queue, because the WASM build rejects re-entrant calls. If the worker cannot load or does not answer, the same question is answered by `lib/kitchen-graph.ts`, a local mirror of the same patterns.
 
-Five-second rule: opening the worker (module download, OPFS open, first seed) has 3 s; one query attempt has 2 s, with exactly one retry, and the whole call is capped at 4.8 s. A worker that fails to open stays off for the session and every later question goes straight to the mirror. The provider asks one path query right after the page mounts, so the worker is warm before the first click on a cell.
+**What the live URL runs.** Every answer carries a note in the UI. "Live engine: Relate (WASM, stored in this browser with OPFS)." means Relate answered. "Sample data: answered by the local graph mirror, not by Relate." means the mirror answered, which is always the case for the overview matrix and is the case for every answer when the deployment runs with the default `ADAPTER_MODE=fake`.
+
+Five-second rule: opening the worker (module download, OPFS open, first seed) has 3 s; one query attempt has 2 s, with exactly one retry, and the whole call is capped at 4.8 s. A worker that fails to open stays off for the session and every later question goes straight to the mirror.
 
 ### Reset and persistence
 
-The only state that changes during the demo is the list of supplier changes applied in this browser. It lives in two places, both in the browser, both behind small wrappers:
-
-- `localStorage` key `sinapis.applied.v1`, read and written only by `lib/store.ts`. The matrix replays this list on the seed, so it survives a reload in either mode.
-- The Relate OPFS store `opfs://sinapis-kitchen` (real mode only), written by the apply in the worker.
-
-The server holds no state: there is no database, no KV and no runtime file write, so there is no migration and no schema push. To return a browser to the demo start state, press "Reset to seed" on the overview (shown after a local change) or open `/?reset=1`. Both clear the localStorage list and, in real mode, wipe the OPFS store and write the seed again in one queued worker job. `npm run demo:reset` rebuilds `kitchen/seed.cypher` (and `kitchen/store` when the `relate` CLI is on PATH) and prints the reset URL and the walk list.
+The only state that changes during the demo is the list of supplier changes applied in this browser: `localStorage` key `sinapis.applied.v1` (read and written only by `lib/store.ts`) and, in real mode, the Relate OPFS store. The server holds no state, so there is no migration and no schema push. Press "Reset to seed" on the overview (shown after a local change) or open `/?reset=1` to clear both.
 
 ### Three queries to paste into `relate` against ./kitchen
 
@@ -95,11 +131,11 @@ Deleting `lib/adapter.real.ts` and `lib/relate.worker.ts` breaks DEMO steps 2, 4
 
 ## Tech stack
 
-- Next.js 15 (App Router), React 19, TypeScript strict, Tailwind CSS v4, shadcn-style primitives (Radix Slot, class-variance-authority, clsx, tailwind-merge, lucide-react)
-- Relate by Neo4j: `@relate/relate-wasm` in a dedicated browser worker with OPFS persistence, `relate` CLI for the directory store
+- Next.js 15 (App Router), React 19, TypeScript strict, Tailwind CSS 4, shadcn-style primitives (Radix Slot, class-variance-authority, clsx, tailwind-merge, lucide-react)
+- Relate by Neo4j: `@relate/relate-wasm` 1.2 in a dedicated browser worker with OPFS persistence, `relate` CLI for the directory store
 - Cypher 25 (variable-length paths)
-- d3 (scales and stacks only) and Motion for the allergen load chart
-- zod for input validation at the API edge
+- d3 7 (scales, stack, cumulative sum, line and link shapes; no DOM work) and Motion 14 for the allergen load chart, its per-allergen and cumulative switch, and the path graph
+- zod 3 for input validation at the API edge
 - tsx and `node:test` for the tests
 - Vercel, no API keys, Relate runs in the browser; API routes answer from the local mirror
 
@@ -108,13 +144,12 @@ Deleting `lib/adapter.real.ts` and `lib/relate.worker.ts` breaks DEMO steps 2, 4
 ```bash
 npm install
 npm run dev          # http://localhost:3000, works with zero env vars
-npm run seed         # writes kitchen/seed.cypher and, if `relate` is on PATH, rebuilds kitchen/store
 npm test             # pinned kitchen facts and input schemas (node:test through tsx)
 npm run proof        # runs the tests, the seed and the Relate queries, and rewrites the proof blocks below
-npm run demo:reset   # rebuilds the seed, prints the /?reset=1 URL and the three-cycle demo walk
+npm run demo:reset   # rebuilds the seed (and kitchen/store if relate is on PATH), prints the reset URL and the walk
 ```
 
-To run the browser path on Relate instead of the local mirror, copy `.env.example` to `.env.local` and set `ADAPTER_MODE=real`. The bundled `@relate/relate-wasm` package is used; `NEXT_PUBLIC_RELATE_WASM_URL` is only an optional override for loading the module from another URL. The note under each answer says "Live engine: Relate (WASM, stored in this browser with OPFS)." when Relate answered, and "Sample data: answered by the local graph mirror, not by Relate." when it did not.
+To run the browser path on Relate instead of the local mirror, copy `.env.example` to `.env.local` and set `ADAPTER_MODE=real`.
 
 ## Proof from the last build
 
@@ -126,11 +161,11 @@ To run the browser path on Relate instead of the local mirror, copy `.env.exampl
 <!-- PROOF:END tests -->
 - Relate engine:
 <!-- PROOF:BEGIN relate-engine -->
-`CYPHER.productImpact` for `p-tahini` on @relate/relate-wasm 1.2.0 in Node, in-memory store seeded with 187 statements, on 2026-11-24: 8 rows, 7 distinct dishes, 30.7 ms.
+`CYPHER.productImpact` for `p-tahini` on @relate/relate-wasm 1.2.0 in Node, in-memory store seeded with 187 statements, on 2026-11-24: 8 rows, 7 distinct dishes, 14.3 ms.
 <!-- PROOF:END relate-engine -->
 - Guest check on Relate (Sesame plus Celery):
 <!-- PROOF:BEGIN guest -->
-`CYPHER.guestSafeDishes` and `CYPHER.guestSwap` for Sesame plus Celery on @relate/relate-wasm 1.2.0 in Node, in-memory store seeded with 187 statements, on 2026-11-24: 3 safe dishes (cacik, grilled-sea-bass, zucchini-fritters), 3 safe with one swap (baba-ghanoush, fried-calamari, roast-cauliflower), roasted cauliflower with the garlic yogurt sauce swap: yes, 70.6 ms.
+`CYPHER.guestSafeDishes` and `CYPHER.guestSwap` for Sesame plus Celery on @relate/relate-wasm 1.2.0 in Node, in-memory store seeded with 187 statements, on 2026-11-24: 3 safe dishes (cacik, grilled-sea-bass, zucchini-fritters), 3 safe with one swap (baba-ghanoush, fried-calamari, roast-cauliflower), roasted cauliflower with the garlic yogurt sauce swap: yes, 27.6 ms.
 <!-- PROOF:END guest -->
 - Seed store:
 <!-- PROOF:BEGIN seed-store -->
@@ -146,13 +181,15 @@ To run the browser path on Relate instead of the local mirror, copy `.env.exampl
 - Import a supplier spec sheet PDF and propose the graph change for the chef to confirm.
 - A printable allergen card per dish, with the path printed beside each flag for the inspector.
 - Several sites sharing one supplier graph, so a change at one supplier warns every kitchen that uses it.
-- Draw the suppliers as their own column in the dish path graph, so a supplier with several products shows as one node.
 
 ## Declarations
 
 - **Relate capabilities used:** embedded WASM engine with OPFS persistence, directory store with the JSON codec, CLI, variable-length Cypher paths, write transactions.
-- **Third-party libraries:** Next.js, React, Tailwind CSS, d3, Motion, zod, lucide-react, class-variance-authority, tailwind-merge, clsx, Radix Slot, and tsx for the tests. All open source. No code written before 11 November 2026.
+- **Third-party tools:** Next.js, React, Tailwind CSS, d3, Motion, zod, Radix Slot, lucide-react, class-variance-authority, tailwind-merge, clsx, and tsx for the tests. All open source. No code written before 11 November 2026.
+- **License:** the repository has no LICENSE file yet.
 
 ## AI use
 
-We used AI coding assistants for scaffolding and boilerplate. Architecture, product decisions, and final code review are our own.
+The hackathon rules allow AI tools: the participant is responsible for the result, for its originality and for its license fit, and significant use must be disclosed. We disclose it here: we used AI coding assistants for scaffolding, boilerplate, the interface pass and the documentation drafts. Architecture, product decisions and final review are our own.
+
+Sinapis is decision support, not a medical guarantee.
