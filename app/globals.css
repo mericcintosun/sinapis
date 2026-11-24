@@ -1,30 +1,38 @@
 @import "tailwindcss";
 
-/* shadcn-style design tokens. The ONLY place colors live: restyle a project by
-   editing these variables from IDENTITY.md; components never carry hex.
-   TEMPLATE placeholder palette: warm neutral, deliberately NOT the navy ground +
-   teal accent the scaffold rules ban, so a token the scaffold forgets to
-   rewrite cannot reintroduce that look. Every value below is replaced. */
+/* D20 clayblock. Every hex below comes from IDENTITY.md's key block.
+   Terracotta blocks carry cream type; content sits on cream cards with kiln-black ink. */
 :root {
-  --background: oklch(0.985 0.004 80);
-  --foreground: oklch(0.2 0.01 60);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2 0.01 60);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2 0.01 60);
-  --primary: oklch(0.45 0.12 40);
-  --primary-foreground: oklch(0.98 0.005 80);
-  --secondary: oklch(0.94 0.008 80);
-  --secondary-foreground: oklch(0.25 0.01 60);
-  --muted: oklch(0.94 0.008 80);
-  --muted-foreground: oklch(0.5 0.01 60);
-  --accent: oklch(0.92 0.02 60);
-  --accent-foreground: oklch(0.2 0.01 60);
-  --destructive: oklch(0.55 0.19 25);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.88 0.01 80);
-  --input: oklch(0.88 0.01 80);
-  --ring: oklch(0.45 0.12 40);
+  --ground: #a8432f;
+  --surface: #963a28;
+  --deep: #84311f;
+  --line: #c96a55;
+  --ink: #fff4e6;
+  --kiln: #1a1210;
+  --on-kiln: #fff4e6;
+  --ok: #c8f0c0;
+  --warn: #ffd98a;
+  --bad: #ffd0c4;
+
+  --background: var(--ground);
+  --foreground: var(--ink);
+  --card: var(--ink);
+  --card-foreground: var(--kiln);
+  --popover: var(--ink);
+  --popover-foreground: var(--kiln);
+  --primary: var(--kiln);
+  --primary-foreground: var(--on-kiln);
+  --secondary: var(--surface);
+  --secondary-foreground: var(--ink);
+  --muted: var(--deep);
+  --muted-foreground: var(--ink);
+  --accent: var(--surface);
+  --accent-foreground: var(--ink);
+  --destructive: var(--bad);
+  --destructive-foreground: var(--kiln);
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--kiln);
   --radius: 0.375rem;
 }
 
@@ -48,13 +56,68 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+
+  --color-ground: var(--ground);
+  --color-surface: var(--surface);
+  --color-deep: var(--deep);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-kiln: var(--kiln);
+  --color-on-kiln: var(--on-kiln);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-bad: var(--bad);
+
+  /* RADIUS soft: 0.375rem on every card, panel and control. */
+  --radius-sm: var(--radius);
+  --radius-md: var(--radius);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-xl: var(--radius);
+
+  --font-display: var(--font-dm-serif), "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --font-sans: var(--font-dm-sans), "Helvetica Neue", Arial, sans-serif;
+}
+
+html {
+  font-family: var(--font-sans);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
+}
+
+h1,
+h2 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+/* M1 rise: translateY(18px) to 0 plus fade, 500ms. Plays in CSS, so content is visible without JS. */
+@keyframes sinapis-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sinapis-rise {
+  animation: sinapis-rise 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.sinapis-rise-group > :nth-child(2) { animation-delay: 70ms; }
+.sinapis-rise-group > :nth-child(3) { animation-delay: 140ms; }
+.sinapis-rise-group > :nth-child(4) { animation-delay: 210ms; }
+.sinapis-rise-group > :nth-child(n + 5) { animation-delay: 280ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sinapis-rise,
+  .sinapis-rise-group > * {
+    animation: none;
+  }
 }
