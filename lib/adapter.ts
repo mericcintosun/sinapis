@@ -30,7 +30,10 @@ export interface KitchenAdapter {
   previewImpact(change: SpecChange, kitchen?: Kitchen): Promise<Answer<ImpactRow[]>>;
   /** Writes the change and returns the kitchen as it reads after the write. */
   applyChange(change: SpecChange, kitchen?: Kitchen): Promise<Answer<Kitchen>>;
+  /** Step 6: safe dishes and dishes one swap away; `engine` says who answered. */
   guestCheck(allergens: AllergenCode[], kitchen?: Kitchen): Promise<Answer<GuestAnswer>>;
+  /** Demo reset: returns the engine store to the seed (OPFS in real mode). Never rejects. */
+  resetStore(): Promise<Engine>;
   /** Synchronous replay of applied changes on the seed, so server HTML stays readable. */
   replay(changes: SpecChange[]): Kitchen;
   /** Synchronous matrix for first render. */

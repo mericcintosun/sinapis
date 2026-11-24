@@ -3,6 +3,7 @@
 // strictly one at a time through the promise queue below.
 //
 // In:  { id, op: "open" }                         open (and seed once) the store
+//      { id, op: "reset" }                        wipe the store and write the seed again
 //      { id, op: "run", cypher, params }          one statement
 //      { id, op: "batch", batch: [{cypher, params}] }  several statements, one round
 // Out: { id, ok: true, rows }  ("batch" answers rows as one row list per statement)
@@ -16,6 +17,7 @@ type Params = Record<string, unknown>;
 type Statement = { cypher: string; params?: Params };
 type WorkerRequest =
   | { id: number; op: "open" }
+  | { id: number; op: "reset" }
   | { id: number; op: "run"; cypher: string; params?: Params }
   | { id: number; op: "batch"; batch: Statement[] };
 
@@ -25,37 +27,48 @@ const scope = self as unknown as {
   addEventListener(type: "message", handler: (e: MessageEvent<WorkerRequest>) => void): void;
 };
 
-// The package's export shape is probed at runtime, so the handles are loosely typed.
-type Db = any;
+// The API of @relate/relate-wasm 1.2.0, read from its relate.d.ts and README:
+//   default export init(): instantiates relate_bg.wasm (fetched next to relate.js)
+//   RelateDb.open("opfs://<name>"): Promise<RelateDb>, dedicated worker only
+//   db.execute(query, paramsJson | null): string, a JSON envelope
+//     { columns: string[], rows: Record<string, unknown>[], stats, error: string | null }
+//   Engine errors come back in `error`; they do not throw. A throw is a wasm trap, after
+//   which the instance is unusable.
+interface Db {
+  execute(query: string, paramsJson?: string | null): string;
+}
+interface RelateModule {
+  default?: (input?: unknown) => Promise<unknown>;
+  RelateDb?: { open(uri: string, readOnly?: boolean | null): Promise<Db> };
+}
 
 const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
 
-async function loadModule(): Promise<any> {
+async function loadModule(): Promise<RelateModule> {
+  let mod: RelateModule;
   try {
-    const mod: any = RELATE_WASM_URL
+    mod = (RELATE_WASM_URL
       ? await import(/* webpackIgnore: true */ RELATE_WASM_URL)
-      : await import("@relate/relate-wasm");
-    // wasm-bindgen style builds export an init function that fetches the .wasm file.
-    if (typeof mod.init === "function") await mod.init();
-    else if (
-      typeof mod.default === "function" &&
-      typeof mod.default.open !== "function" &&
-      !mod.RelateDb &&
-      typeof mod.open !== "function"
-    )
-      await mod.default();
-    return mod;
+      : await import("@relate/relate-wasm")) as RelateModule;
   } catch {
     throw new CoreError("not_configured", "Relate WASM module could not be loaded");
   }
+  // wasm-bindgen init: must run before any RelateDb call, or every call fails inside the
+  // glue code (the Phase 2 proof hit exactly that: __wbindgen_malloc of undefined).
+  try {
+    if (typeof mod.default === "function") await mod.default();
+  } catch {
+    throw new CoreError("not_configured", "Relate WASM binary could not be instantiated");
+  }
+  if (typeof mod.RelateDb?.open !== "function") {
+    throw new CoreError("not_configured", "Relate WASM module has no RelateDb.open");
+  }
+  return mod;
 }
 
-async function openDb(mod: any): Promise<Db> {
-  const ns = mod.RelateDb ?? mod.default?.RelateDb ?? mod.Relate ?? mod.default ?? mod;
-  const open = typeof ns?.open === "function" ? ns.open.bind(ns) : typeof mod.open === "function" ? mod.open.bind(mod) : null;
-  if (!open) throw new CoreError("not_configured", "Relate WASM module has no open()");
+async function openDb(mod: RelateModule): Promise<Db> {
   try {
-    return await open(RELATE_STORE_URI);
+    return await mod.RelateDb!.open(RELATE_STORE_URI);
   } catch {
     throw new CoreError("upstream_error", "Relate could not open the OPFS store");
   }
@@ -87,37 +100,57 @@ function toRows(result: unknown): Row[] {
   throw new CoreError("parse_failure", "Relate returned a result shape the worker does not know");
 }
 
-let callName: string | null = null;
+/** Set after a wasm trap: the instance is dead for the rest of this worker's life. */
+let trapped = false;
 
-/** The one place that calls the database. Method names are probed once: query, run, execute. */
+/** The one place that calls the database: db.execute with JSON params, envelope parsed. */
 async function callDb(db: Db, cypher: string, params: Params = {}): Promise<Row[]> {
-  if (!callName) {
-    callName = ["query", "run", "execute"].find((m) => typeof db?.[m] === "function") ?? null;
-    if (!callName) throw new CoreError("not_configured", "Relate database exposes no query, run or execute method");
-  }
-  let result: unknown;
+  if (trapped) throw new CoreError("not_configured", "Relate stopped after a WASM trap; reload the page");
+  let raw: string;
   try {
-    result = await db[callName](cypher, params);
+    raw = db.execute(cypher, Object.keys(params).length > 0 ? JSON.stringify(params) : null);
   } catch {
+    trapped = true;
+    throw new CoreError("not_configured", "Relate stopped after a WASM trap; reload the page");
+  }
+  let envelope: { error?: unknown };
+  try {
+    envelope = JSON.parse(raw) as { error?: unknown };
+  } catch {
+    throw new CoreError("parse_failure", "Relate returned an envelope that is not JSON");
+  }
+  if (envelope && typeof envelope === "object" && envelope.error) {
     throw new CoreError("upstream_error", "Relate rejected a Cypher statement");
   }
-  return toRows(result);
+  return toRows(envelope);
 }
 
 let dbPromise: Promise<Db> | null = null;
+
+const countOf = (rows: Row[]) => Number(rows[0]?.n ?? Object.values(rows[0] ?? {})[0] ?? 0);
+
+/** Wipes every relationship and node, then writes the seed and the seed marker. */
+async function reseed(db: Db): Promise<number> {
+  await callDb(db, CYPHER.wipeRelationships);
+  await callDb(db, CYPHER.wipeNodes);
+  const statements = seedStatements(seedKitchen);
+  for (const s of statements) await callDb(db, s);
+  // The marker is written last, so a seed cut short (tab closed, init timeout) is redone.
+  await callDb(db, CYPHER.seedMarkCreate);
+  return statements.length;
+}
 
 async function init(): Promise<Db> {
   const t0 = now();
   const mod = await loadModule();
   const db = await openDb(mod);
-  const counted = await callDb(db, CYPHER.dishCount);
-  const n = Number(counted[0]?.n ?? Object.values(counted[0] ?? {})[0] ?? 0);
-  if (n === 0) {
-    const statements = seedStatements(seedKitchen);
-    for (const s of statements) await callDb(db, s);
-    console.info(`${LOG_PREFIX} relate seed statements=${statements.length}`);
+  const marked = countOf(await callDb(db, CYPHER.seedMarkCount));
+  if (marked === 0) {
+    const n = await reseed(db);
+    console.info(`${LOG_PREFIX} relate seed statements=${n}`);
   }
-  console.info(`${LOG_PREFIX} relate open ok dishes=${n === 0 ? seedKitchen.dishes.length : n} ${Math.round(now() - t0)}ms`);
+  const dishes = countOf(await callDb(db, CYPHER.dishCount));
+  console.info(`${LOG_PREFIX} relate open ok dishes=${dishes} ${Math.round(now() - t0)}ms`);
   return db;
 }
 
@@ -142,6 +175,13 @@ function enqueue<T>(job: () => Promise<T>): Promise<T> {
 async function handle(msg: WorkerRequest): Promise<unknown> {
   const db = await database();
   if (msg.op === "open") return [];
+  if (msg.op === "reset") {
+    // Runs as one queued job: no other statement can interleave with the wipe and seed.
+    const t0 = now();
+    const n = await reseed(db);
+    console.info(`${LOG_PREFIX} relate reset statements=${n} ${Math.round(now() - t0)}ms`);
+    return [];
+  }
   if (msg.op === "run") return callDb(db, msg.cypher, msg.params);
   if (msg.op === "batch") {
     const out: Row[][] = [];

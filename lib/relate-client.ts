@@ -3,7 +3,13 @@
 // CoreError whose `code` is an ErrorCode, so the adapter can fall back to the mirror.
 //
 // Logs carry ids, counts and durations only, never Cypher parameters or rows.
-import { LOG_PREFIX, RELATE_RETRIES, RELATE_TIMEOUT_MS, WORKER_INIT_TIMEOUT_MS } from "@/lib/config";
+import {
+  LOG_PREFIX,
+  RELATE_BUDGET_MS,
+  RELATE_RETRIES,
+  RELATE_TIMEOUT_MS,
+  WORKER_INIT_TIMEOUT_MS,
+} from "@/lib/config";
 import { CoreError, errorCodeOf, isErrorCode, type ErrorCode } from "@/lib/errors";
 import type { Row } from "@/lib/relate";
 
@@ -11,6 +17,7 @@ type Params = Record<string, unknown>;
 export type Statement = { cypher: string; params?: Params };
 type Outgoing =
   | { op: "open" }
+  | { op: "reset" }
   | { op: "run"; cypher: string; params?: Params }
   | { op: "batch"; batch: Statement[] };
 type Reply = { id: number; ok: true; rows: unknown } | { id: number; ok: false; error: unknown; hint?: unknown };
@@ -106,23 +113,33 @@ function ensureOpen(): Promise<void> {
   return opening;
 }
 
-async function once(msg: Outgoing): Promise<unknown> {
+/** One attempt. Its timeout is RELATE_TIMEOUT_MS, cut to what is left of the call budget. */
+async function once(msg: Outgoing, deadline: number): Promise<unknown> {
   await ensureOpen();
-  return post(msg, RELATE_TIMEOUT_MS);
+  const left = Math.max(1, Math.min(RELATE_TIMEOUT_MS, Math.round(deadline - now())));
+  return post(msg, left);
 }
 
-/** One attempt plus exactly RELATE_RETRIES (1) retry. Init failures are not retried. */
+/**
+ * One attempt plus exactly RELATE_RETRIES (1) retry. Init failures are not retried, and the
+ * retry is skipped when it could end past RELATE_BUDGET_MS, so a step never waits over 5 s.
+ */
 async function call(label: string, msg: Outgoing): Promise<unknown> {
   const t0 = now();
+  const deadline = t0 + RELATE_BUDGET_MS;
   try {
-    const rows = await once(msg);
+    const rows = await once(msg, deadline);
     console.info(`${LOG_PREFIX} relate ${label} ok ${Math.round(now() - t0)}ms`);
     return rows;
   } catch (first) {
     const code = errorCodeOf(first);
     if (RELATE_RETRIES < 1 || disabled || code === "not_configured" || code === "invalid_input") throw first;
+    if (now() - t0 + RELATE_TIMEOUT_MS > RELATE_BUDGET_MS) {
+      console.warn(`${LOG_PREFIX} relate ${label} no retry, budget spent after ${code}`);
+      throw first;
+    }
     console.warn(`${LOG_PREFIX} relate ${label} retry after ${code}`);
-    const rows = await once(msg);
+    const rows = await once(msg, deadline);
     console.info(`${LOG_PREFIX} relate ${label} ok after retry ${Math.round(now() - t0)}ms`);
     return rows;
   }
@@ -136,6 +153,17 @@ function asRows(x: unknown): Row[] {
 /** Runs one Cypher statement in the Relate worker. */
 export async function runCypher(cypher: string, params: Params = {}): Promise<Row[]> {
   return asRows(await call("run", { op: "run", cypher, params }));
+}
+
+/**
+ * Wipes the OPFS store and writes the seed again, as one queued worker job (same timeout,
+ * retry and error mapping as runBatch). Resolves false without asking when the worker is
+ * unavailable (server, no Worker, or a sticky failure this session); true once Relate reset.
+ */
+export async function resetRelate(): Promise<boolean> {
+  if (!relateAvailable()) return false;
+  await call("reset", { op: "reset" });
+  return true;
 }
 
 /** Runs several statements in one worker round, in order. Answers one row list per statement. */

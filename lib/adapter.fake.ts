@@ -37,6 +37,10 @@ export const fakeAdapter: KitchenAdapter = {
   async guestCheck(allergens, kitchen = seedKitchen) {
     return { engine: MIRROR, data: mirrorGuestCheck(kitchen, allergens) };
   },
+  async resetStore() {
+    // The mirror holds no state of its own: the seed is replayed from data/kitchen.json.
+    return MIRROR;
+  },
   replay,
   matrixOf: buildMatrix,
 };
