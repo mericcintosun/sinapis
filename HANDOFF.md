@@ -96,9 +96,18 @@ None, no shell. The runner must verify: `npm install`, `npm run build` with zero
 
 Unverified here (no shell): build, tests, and that the crawl sees "Live engine" on `/`. The parity check (`[core] parity ok` in the console) compares Relate's matrix with the mirror's cell by cell.
 
+## QA round 2 (live crawl, 2026-11-24)
+
+| Finding | Root cause | Fix |
+| --- | --- | --- |
+| proof: `npm test` 17 passed, 0 failed | not a failure | none |
+| screenshots of `/dishes/[id]`: "Local mirror. Relate could not open in this browser" on a cold load | the dish page asks `getDishPaths` right away; the 7.2 MB WASM open outlasts the 3 s step budget, so the mirror answered and the note claimed Relate could not open, while the open was still running and later succeeded. The overview never showed this because `getMatrix` already waits for `relateReady()`. The guest check on `/dishes` had the same race | `askRelate` in `lib/adapter.ts` (new `whenReady()` on the adapter seam, `lib/adapter.real.ts`, `lib/adapter.fake.ts`): a mirror answer in real mode is shown at once as "Asking Relate", the call waits for the open and asks again, and switches the note to "Live engine". Only a genuine open failure keeps "Local mirror". Used in `components/dish-paths.tsx` and `components/dish-browser.tsx` |
+
+Unverified here (no shell): build, and that the crawl now sees "Live engine" on a dish page (a crawl that screenshots before the WASM open ends will see "Asking Relate", which is honest).
+
 ## QA: external findings
 
-None. Both data findings had causes inside this repo.
+None. Every finding so far had its cause inside this repo.
 
 ## Next best step
 
