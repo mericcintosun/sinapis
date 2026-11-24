@@ -4,9 +4,8 @@ import * as React from "react";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import type { AllergenCode } from "@/lib/data";
-import type { ImpactRow, SpecChange } from "@/lib/kitchen-graph";
-import { fetchImpact, type Engine } from "@/lib/relate";
-import { useKitchen } from "@/components/kitchen-provider";
+import type { Engine, ImpactRow, SpecChange } from "@/lib/types";
+import { useKitchen, useKitchenAdapter } from "@/components/kitchen-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +25,7 @@ const STATUS_WORD = { contains: "contains", may: "may contain", unknown: "unknow
 // breaks (reverse traversal, read only), then commits it as a write.
 export function SupplierChangeForm() {
   const { kitchen, apply } = useKitchen();
+  const adapter = useKitchenAdapter();
   const [change, setChange] = React.useState<SpecChange>({
     productId: "p-tahini",
     allergen: "PNT",
@@ -41,8 +41,8 @@ export function SupplierChangeForm() {
   const preview = async () => {
     setPhase({ kind: "previewing" });
     try {
-      const r = await fetchImpact(kitchen, change);
-      setPhase({ kind: "preview", ...r });
+      const r = await adapter.previewImpact(change, kitchen);
+      setPhase({ kind: "preview", engine: r.engine, rows: r.data });
     } catch (e) {
       setPhase({ kind: "error", message: e instanceof Error ? e.message : "Preview failed" });
     }

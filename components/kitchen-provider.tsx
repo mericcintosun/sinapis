@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import { seedKitchen, type ChangeEntry, type Kitchen } from "@/lib/data";
-import { applySpecChange, buildMatrix, type Matrix, type SpecChange } from "@/lib/kitchen-graph";
-import { commitSpecChange, type Engine } from "@/lib/relate";
+import { getAdapter } from "@/lib/adapter";
+import type { Engine, Matrix, SpecChange } from "@/lib/types";
 
 interface AppliedChange extends SpecChange {
   entry: ChangeEntry;
@@ -23,10 +23,7 @@ const KitchenContext = React.createContext<KitchenContextValue | null>(null);
 // Browser persistence for applied changes. With Relate WASM configured, the graph
 // itself also persists in OPFS (opfs://sinapis-kitchen).
 const STORAGE_KEY = "sinapis.applied.v1";
-
-function replay(changes: AppliedChange[]): Kitchen {
-  return changes.reduce((k, c) => applySpecChange(k, c), seedKitchen);
-}
+const adapter = getAdapter();
 
 export function KitchenProvider({ children }: { children: React.ReactNode }) {
   const [applied, setApplied] = React.useState<AppliedChange[]>([]);
@@ -41,8 +38,8 @@ export function KitchenProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const kitchen = React.useMemo(() => replay(applied), [applied]);
-  const matrix = React.useMemo(() => buildMatrix(kitchen), [kitchen]);
+  const kitchen = React.useMemo(() => adapter.replay(applied), [applied]);
+  const matrix = React.useMemo(() => adapter.matrixOf(kitchen), [kitchen]);
   const log = React.useMemo(
     () => [...applied.map((a) => a.entry).reverse(), ...seedKitchen.history],
     [applied],
@@ -50,7 +47,7 @@ export function KitchenProvider({ children }: { children: React.ReactNode }) {
 
   const apply = React.useCallback(
     async (change: SpecChange, affectedDishIds: string[]) => {
-      const engine = await commitSpecChange(kitchen, change);
+      const { engine } = await adapter.applyChange(change, kitchen);
       const entry: ChangeEntry = {
         id: `log-${Date.now()}`,
         date: new Date().toISOString().slice(0, 10),
@@ -86,4 +83,9 @@ export function useKitchen() {
   const ctx = React.useContext(KitchenContext);
   if (!ctx) throw new Error("useKitchen must be used inside KitchenProvider");
   return ctx;
+}
+
+/** The adapter the provider uses, for components that ask the graph directly. */
+export function useKitchenAdapter() {
+  return adapter;
 }

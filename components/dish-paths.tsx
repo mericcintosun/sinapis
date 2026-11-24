@@ -3,9 +3,8 @@
 import * as React from "react";
 import { ChevronRight } from "lucide-react";
 import type { AllergenCode } from "@/lib/data";
-import type { AllergenPath } from "@/lib/kitchen-graph";
-import { fetchDishPaths, type Engine } from "@/lib/relate";
-import { useKitchen } from "@/components/kitchen-provider";
+import type { AllergenPath, Engine } from "@/lib/types";
+import { useKitchen, useKitchenAdapter } from "@/components/kitchen-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,19 +27,21 @@ const KIND_LABEL: Record<string, string> = {
 // an allergen, or to a product with no spec sheet.
 export function DishPaths({ dishId, focus }: { dishId: string; focus: AllergenCode | null }) {
   const { kitchen, matrix } = useKitchen();
+  const adapter = useKitchenAdapter();
   const [state, setState] = React.useState<State>({ kind: "loading" });
   const [attempt, setAttempt] = React.useState(0);
 
   React.useEffect(() => {
     let live = true;
     setState({ kind: "loading" });
-    fetchDishPaths(kitchen, dishId)
-      .then((r) => live && setState({ kind: "ready", ...r }))
+    adapter
+      .getDishPaths(dishId, kitchen)
+      .then((r) => live && setState({ kind: "ready", engine: r.engine, paths: r.data }))
       .catch((e: unknown) => live && setState({ kind: "error", message: e instanceof Error ? e.message : "Query failed" }));
     return () => {
       live = false;
     };
-  }, [kitchen, dishId, attempt]);
+  }, [adapter, kitchen, dishId, attempt]);
 
   const supplierOf = (productId: string) => {
     const p = kitchen.products.find((x) => x.id === productId);
