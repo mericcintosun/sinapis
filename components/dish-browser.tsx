@@ -177,7 +177,7 @@ export function DishBrowser() {
               <DishRow
                 key={d.id}
                 dish={d}
-                note={guest.length ? "No path to the guest's allergens" : `${flagCount(d)} allergens flagged`}
+                note={guest.length ? "No path to the guest's allergens" : `${flagCount(d)} ${flagCount(d) === 1 ? "allergen" : "allergens"} flagged`}
                 badge={guest.length ? "free" : undefined}
               />
             ))}
