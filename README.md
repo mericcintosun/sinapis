@@ -2,7 +2,7 @@
 
 An allergen graph for a restaurant kitchen. Sinapis shows which sauce and which supplier product put each allergen on each dish, and when a supplier changes a recipe it lists the affected dishes before you accept the change.
 
-> Live demo: https://sinapis.vercel.app
+> Live demo: https://sinapis-nine.vercel.app
 
 ## The problem
 
