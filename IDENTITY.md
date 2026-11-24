@@ -86,3 +86,5 @@ Rules:
 ## Amendments (append-only; later phases add dated lines here, never edit anything above)
 
 - 2026-11-24, Phase 4: kit signature 2 shipped as `components/path-graph.tsx` on `/dishes/[id]`. d3 `scalePoint`, `scaleBand` and `linkHorizontal` do the layout, React renders the SVG, and `motion.path` draws the links with `pathLength`. Hovering or focusing a node rewrites the sentence under the graph. No new package.
+- 2026-11-24, Phase 5: kit signature 3 shipped in `components/allergen-load-chart.tsx` on `/`. A `components/ui/toggle-group.tsx` button group (aria-pressed, arrow keys, no tablist) switches "Per allergen" and "Cumulative"; d3 computes the running total with `d3.cumsum` and the step line with `d3.line` and `curveStepAfter`, and Motion interpolates every bar's `d` between the two shapes. No new package.
+- 2026-11-24, Phase 5: six scene slots placed through `components/scene-slot.tsx`: 1 on `/`, 2 on `/dishes`, 3 on `/dishes/[id]`, 4 and 5 on `/activity`, 6 on the not-found page. `public/illustrations/scene-4.svg` to `scene-6.svg` added in the key block palette.
