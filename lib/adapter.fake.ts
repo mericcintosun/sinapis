@@ -43,4 +43,7 @@ export const fakeAdapter: KitchenAdapter = {
   },
   replay,
   matrixOf: buildMatrix,
+  async whenReady() {
+    return false;
+  },
 };

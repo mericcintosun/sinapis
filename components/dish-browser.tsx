@@ -4,7 +4,8 @@ import * as React from "react";
 import Link from "next/link";
 import { ALLERGEN_CODES, type AllergenCode, type Dish, type MenuSection } from "@/lib/data";
 import { swapLine } from "@/lib/kitchen-graph";
-import type { Engine, GuestAnswer } from "@/lib/types";
+import type { GuestAnswer } from "@/lib/types";
+import { askRelate, type ShownEngine } from "@/lib/adapter";
 import { useKitchen, useKitchenAdapter } from "@/components/kitchen-provider";
 import { EngineNote } from "@/components/engine-note";
 import { EmptyState, ErrorState } from "@/components/route-states";
@@ -22,7 +23,7 @@ type GuestState =
   | { kind: "idle" }
   | { kind: "loading" }
   | { kind: "error"; message: string }
-  | { kind: "ready"; engine: Engine; answer: GuestAnswer };
+  | { kind: "ready"; engine: ShownEngine; answer: GuestAnswer };
 
 // Dish list with search, section filter and guest mode: pick the guest's allergens,
 // get safe dishes and dishes that become safe with one substitution.
@@ -47,10 +48,12 @@ export function DishBrowser() {
     }
     let live = true;
     setCheck({ kind: "loading" });
-    adapter
-      .guestCheck(guest, kitchen)
-      .then((r) => live && setCheck({ kind: "ready", engine: r.engine, answer: r.data }))
-      .catch((e: unknown) => live && setCheck({ kind: "error", message: e instanceof Error ? e.message : "Guest check failed" }));
+    askRelate(
+      adapter,
+      () => adapter.guestCheck(guest, kitchen),
+      (engine, answer) => setCheck({ kind: "ready", engine, answer }),
+      () => live,
+    ).catch((e: unknown) => live && setCheck({ kind: "error", message: e instanceof Error ? e.message : "Guest check failed" }));
     return () => {
       live = false;
     };

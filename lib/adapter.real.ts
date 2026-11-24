@@ -193,4 +193,5 @@ export const realAdapter: KitchenAdapter = {
 
   replay,
   matrixOf: fakeAdapter.matrixOf,
+  whenReady: relateReady,
 };

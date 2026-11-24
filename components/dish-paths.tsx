@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { ALLERGEN_CODES, type AllergenCode } from "@/lib/data";
-import type { AllergenPath, Engine } from "@/lib/types";
+import type { AllergenPath } from "@/lib/types";
+import { askRelate, type ShownEngine } from "@/lib/adapter";
 import { useKitchen, useKitchenAdapter } from "@/components/kitchen-provider";
 import { EngineNote } from "@/components/engine-note";
 import { EmptyState, ErrorState } from "@/components/route-states";
@@ -56,7 +57,7 @@ export function DishPathsFromQuery({ dishId }: { dishId: string }) {
 type State =
   | { kind: "loading" }
   | { kind: "error"; message: string }
-  | { kind: "ready"; engine: Engine; paths: AllergenPath[] };
+  | { kind: "ready"; engine: ShownEngine; paths: AllergenPath[] };
 
 const KIND_LABEL: Record<string, string> = {
   Dish: "Dish",
@@ -77,10 +78,12 @@ export function DishPaths({ dishId, focus }: { dishId: string; focus: AllergenCo
   React.useEffect(() => {
     let live = true;
     setState({ kind: "loading" });
-    adapter
-      .getDishPaths(dishId, kitchen)
-      .then((r) => live && setState({ kind: "ready", engine: r.engine, paths: r.data }))
-      .catch((e: unknown) => live && setState({ kind: "error", message: e instanceof Error ? e.message : "Query failed" }));
+    askRelate(
+      adapter,
+      () => adapter.getDishPaths(dishId, kitchen),
+      (engine, paths) => setState({ kind: "ready", engine, paths }),
+      () => live,
+    ).catch((e: unknown) => live && setState({ kind: "error", message: e instanceof Error ? e.message : "Query failed" }));
     return () => {
       live = false;
     };

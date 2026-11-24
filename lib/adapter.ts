@@ -38,9 +38,49 @@ export interface KitchenAdapter {
   replay(changes: SpecChange[]): Kitchen;
   /** Synchronous matrix for first render. */
   matrixOf(kitchen: Kitchen): Matrix;
+  /**
+   * Resolves true once Relate is open in this browser (waits for a cold WASM load), false on
+   * the server, in fake mode, or after a real failure this session.
+   */
+  whenReady(): Promise<boolean>;
 }
 
 export type { Engine } from "@/lib/relate";
+
+/** Engine shown next to an answer: "pending" while the mirror stands in for a Relate still opening. */
+export type ShownEngine = Engine | "pending";
+
+/**
+ * Asks once. If the mirror answered in real mode, Relate may only be still loading its 7 MB
+ * WASM (a cold first visit outlasts the 3 s step budget), so that answer is shown as
+ * "pending", the call waits for the open and asks again. Only a Relate that truly cannot open
+ * leaves the answer labelled "local-mirror".
+ */
+export async function askRelate<T>(
+  adapter: KitchenAdapter,
+  ask: () => Promise<Answer<T>>,
+  show: (engine: ShownEngine, data: T) => void,
+  isLive: () => boolean,
+): Promise<void> {
+  const first = await ask();
+  if (!isLive()) return;
+  if (first.engine === "relate-wasm" || adapter.mode !== "real") {
+    show(first.engine, first.data);
+    return;
+  }
+  show("pending", first.data);
+  if (!(await adapter.whenReady())) {
+    if (isLive()) show("local-mirror", first.data);
+    return;
+  }
+  if (!isLive()) return;
+  try {
+    const again = await ask();
+    if (isLive()) show(again.engine, again.data);
+  } catch {
+    if (isLive()) show("local-mirror", first.data);
+  }
+}
 
 export function adapterMode(): AdapterMode {
   return ADAPTER_MODE;
