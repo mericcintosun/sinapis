@@ -20,8 +20,8 @@ interface KitchenContextValue {
 }
 
 const KitchenContext = React.createContext<KitchenContextValue | null>(null);
-// Browser persistence for applied changes. With Relate WASM configured, the graph
-// itself also persists in OPFS (opfs://sinapis-kitchen).
+// Browser persistence for applied changes. With ADAPTER_MODE=real the Relate graph
+// itself also persists in OPFS (opfs://sinapis-kitchen) inside the Relate worker.
 const STORAGE_KEY = "sinapis.applied.v1";
 const adapter = getAdapter();
 

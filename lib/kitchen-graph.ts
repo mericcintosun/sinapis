@@ -1,8 +1,8 @@
 // Local mirror of the Relate graph. It walks exactly the pattern the Cypher in
 // lib/relate.ts asks Relate for:
 //   (:Dish)-[:USES*]->(:Ingredient)-[:SUPPLIED_AS]->(:SupplierProduct)-[:CONTAINS|MAY_CONTAIN]->(:Allergen)
-// It renders the matrix synchronously (so server HTML is readable) and answers when
-// NEXT_PUBLIC_RELATE_WASM_URL is not set.
+// It renders the matrix synchronously (so server HTML is readable), answers in fake
+// mode, and is the fallback whenever the Relate worker cannot answer.
 import {
   ALLERGEN_CODES,
   type AllergenCode,

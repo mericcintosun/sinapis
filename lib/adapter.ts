@@ -1,27 +1,19 @@
-// The kitchen adapter seam. Every page, component and API handler asks the kitchen
-// through getAdapter(), never through lib/kitchen-graph.ts or lib/relate.ts directly.
+// The kitchen adapter seam and the only module that branches on ADAPTER_MODE.
+// Every page, component and API handler asks the kitchen through getAdapter().
 //
-// fake: answers from the local graph mirror (lib/kitchen-graph.ts) over the seed.
-// real: answers through lib/relate.ts, which runs Relate WASM when
-//       NEXT_PUBLIC_RELATE_WASM_URL is set and falls back to the mirror otherwise.
+// fake (default): lib/adapter.fake.ts answers from the local graph mirror.
+// real: lib/adapter.real.ts asks Relate WASM in a browser worker for the path list,
+//       the impact preview and the write, and falls back to the mirror when it cannot.
 //
 // Every method takes an optional kitchen: the client passes its current state (the seed
 // plus the changes applied in this browser); the API handlers use the seed.
-import { seedKitchen, type AllergenCode, type Kitchen } from "@/lib/data";
-import {
-  applySpecChange,
-  buildMatrix,
-  dishPaths,
-  guestCheck as mirrorGuestCheck,
-  previewImpact as mirrorPreviewImpact,
-  type AllergenPath,
-  type GuestAnswer,
-  type ImpactRow,
-  type Matrix,
-  type SpecChange,
-} from "@/lib/kitchen-graph";
-import { commitSpecChange, fetchDishPaths, fetchImpact, type Engine } from "@/lib/relate";
+import type { AllergenCode, Kitchen } from "@/lib/data";
+import type { AllergenPath, GuestAnswer, ImpactRow, Matrix, SpecChange } from "@/lib/kitchen-graph";
+import type { Engine } from "@/lib/relate";
 import type { AdapterMode } from "@/lib/types";
+import { ADAPTER_MODE } from "@/lib/config";
+import { fakeAdapter } from "@/lib/adapter.fake";
+import { realAdapter } from "@/lib/adapter.real";
 
 export interface Answer<T> {
   engine: Engine;
@@ -30,6 +22,8 @@ export interface Answer<T> {
 
 export interface KitchenAdapter {
   mode: AdapterMode;
+  /** Engine behind the synchronous replay() and matrixOf(), which draw the overview matrix. */
+  matrixEngine: Engine;
   getKitchen(kitchen?: Kitchen): Promise<Answer<Kitchen>>;
   getMatrix(kitchen?: Kitchen): Promise<Answer<Matrix>>;
   getDishPaths(dishId: string, kitchen?: Kitchen): Promise<Answer<AllergenPath[]>>;
@@ -43,61 +37,10 @@ export interface KitchenAdapter {
   matrixOf(kitchen: Kitchen): Matrix;
 }
 
-const MIRROR: Engine = "local-mirror";
-
-const replay = (changes: SpecChange[]) => changes.reduce((k, c) => applySpecChange(k, c), seedKitchen);
-
-export const fakeAdapter: KitchenAdapter = {
-  mode: "fake",
-  async getKitchen(kitchen = seedKitchen) {
-    return { engine: MIRROR, data: kitchen };
-  },
-  async getMatrix(kitchen = seedKitchen) {
-    return { engine: MIRROR, data: buildMatrix(kitchen) };
-  },
-  async getDishPaths(dishId, kitchen = seedKitchen) {
-    return { engine: MIRROR, data: dishPaths(kitchen, dishId) };
-  },
-  async previewImpact(change, kitchen = seedKitchen) {
-    return { engine: MIRROR, data: mirrorPreviewImpact(kitchen, change) };
-  },
-  async applyChange(change, kitchen = seedKitchen) {
-    return { engine: MIRROR, data: applySpecChange(kitchen, change) };
-  },
-  async guestCheck(allergens, kitchen = seedKitchen) {
-    return { engine: MIRROR, data: mirrorGuestCheck(kitchen, allergens) };
-  },
-  replay,
-  matrixOf: buildMatrix,
-};
-
-// Thin wrapper over lib/relate.ts. Those functions already fall back to the mirror
-// when Relate is not configured; their behavior is unchanged here.
-export const realAdapter: KitchenAdapter = {
-  mode: "real",
-  getKitchen: fakeAdapter.getKitchen,
-  getMatrix: fakeAdapter.getMatrix,
-  async getDishPaths(dishId, kitchen = seedKitchen) {
-    const r = await fetchDishPaths(kitchen, dishId);
-    return { engine: r.engine, data: r.paths };
-  },
-  async previewImpact(change, kitchen = seedKitchen) {
-    const r = await fetchImpact(kitchen, change);
-    return { engine: r.engine, data: r.rows };
-  },
-  async applyChange(change, kitchen = seedKitchen) {
-    const engine = await commitSpecChange(kitchen, change);
-    return { engine, data: applySpecChange(kitchen, change) };
-  },
-  // Guest mode has no Cypher yet (Phase 2), so it always answers from the mirror.
-  guestCheck: fakeAdapter.guestCheck,
-  replay,
-  matrixOf: buildMatrix,
-};
+export type { Engine } from "@/lib/relate";
 
 export function adapterMode(): AdapterMode {
-  const raw = process.env.ADAPTER_MODE ?? process.env.NEXT_PUBLIC_ADAPTER_MODE;
-  return raw === "real" ? "real" : "fake";
+  return ADAPTER_MODE;
 }
 
 export function getAdapter(): KitchenAdapter {
