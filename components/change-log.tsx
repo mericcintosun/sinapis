@@ -11,7 +11,15 @@ const KIND_WORD = { contains: "now contains", may: "may now contain", clear: "no
 export function ChangeLog() {
   const { kitchen, log } = useKitchen();
   if (log.length === 0) {
-    return <p className="rounded-md border border-dashed border-line p-4 text-ink/85">No supplier changes logged yet.</p>;
+    return (
+      <p className="rounded-md border border-dashed border-line p-4 text-ink/85">
+        No supplier changes logged yet. When a supplier emails a new declaration, enter it in the{" "}
+        <Link href="#log-change" className="underline decoration-line underline-offset-4 hover:decoration-ink">
+          supplier change form
+        </Link>{" "}
+        above.
+      </p>
+    );
   }
   return (
     <ol className="sinapis-rise-group space-y-3">

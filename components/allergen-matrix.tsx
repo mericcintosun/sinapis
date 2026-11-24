@@ -31,8 +31,8 @@ export function AllergenMatrix({
   onFocus: (code: AllergenCode | null) => void;
 }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[760px] border-separate border-spacing-1 text-sm">
+    <div className="max-w-full overflow-x-auto">
+      <table className="w-full min-w-[47.5rem] border-separate border-spacing-1 text-sm">
         <caption className="sr-only">
           Allergen matrix: C means contains, M means may contain, a question mark means the supplier spec is unknown.
         </caption>

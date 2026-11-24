@@ -49,7 +49,8 @@ export function AllergenLoadChart({
 
   return (
     <figure className="space-y-3">
-      <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label={summary}>
+      <div className="max-w-full overflow-x-auto">
+      <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full min-w-[30rem]" role="img" aria-label={summary}>
         {y.ticks(4).map((t) => (
           <g key={t}>
             <line x1={M.l} x2={W - M.r} y1={y(t)} y2={y(t)} className="stroke-line" strokeWidth={1} />
@@ -96,6 +97,7 @@ export function AllergenLoadChart({
           </g>
         ))}
       </svg>
+      </div>
       <figcaption className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-ink/85">
         <span className="flex items-center gap-2"><span className="size-3 rounded-sm bg-bad" />Contains</span>
         <span className="flex items-center gap-2"><span className="size-3 rounded-sm bg-warn" />May contain</span>

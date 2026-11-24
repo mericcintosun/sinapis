@@ -35,6 +35,11 @@ export function DishBrowser() {
   const safe = guest.length ? answer.safe.filter(match) : kitchen.dishes.filter(match);
   const swappable = guest.length ? answer.swappable.filter((s) => match(s.dish)) : [];
   const unsafe = guest.length ? answer.unsafe.filter((u) => match(u.dish)) : [];
+  const filtered = query.trim() !== "" || section !== "All";
+  const clearFilters = () => {
+    setQuery("");
+    setSection("All");
+  };
 
   return (
     <div className="space-y-6">
@@ -67,7 +72,7 @@ export function DishBrowser() {
               placeholder="Search dishes, English or Turkish name"
               aria-label="Search dishes"
             />
-            <div className="flex gap-1">
+            <div className="flex flex-wrap gap-1" role="group" aria-label="Menu section">
               {SECTIONS.map((s) => (
                 <Button
                   key={s}
@@ -82,17 +87,31 @@ export function DishBrowser() {
               ))}
             </div>
           </div>
-          {guest.length > 0 && (
+          {guest.length > 0 ? (
             <p className="text-sm text-kiln/80">
               Avoiding {guest.map(nameOf).join(" and ")}: {answer.safe.length} safe, {answer.swappable.length} safe with
               one swap, {answer.unsafe.length} off the table.
+            </p>
+          ) : (
+            <p className="text-sm text-kiln/80">
+              No guest allergens picked yet. Tap the ones the guest names, for example Sesame and Celery.
             </p>
           )}
         </CardContent>
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <DishColumn title={guest.length ? "Safe to serve" : "All dishes"} empty="No dish matches this search.">
+        <DishColumn
+          title={guest.length ? "Safe to serve" : "All dishes"}
+          empty={filtered ? "No dish matches this search and section." : "No dish is clear for this guest."}
+          action={
+            filtered ? (
+              <Button size="sm" variant="cream" onClick={clearFilters} className="mt-3">
+                Clear filters
+              </Button>
+            ) : undefined
+          }
+        >
           {safe.map((d) => (
             <DishRow key={d.id} dish={d} note={guest.length ? "No path to the guest's allergens" : `${flagCount(d)} allergens flagged`} badge={guest.length ? "free" : undefined} />
           ))}
@@ -121,14 +140,27 @@ export function DishBrowser() {
   );
 }
 
-function DishColumn({ title, empty, children }: { title: string; empty: string; children: React.ReactNode[] }) {
+function DishColumn({
+  title,
+  empty,
+  action,
+  children,
+}: {
+  title: string;
+  empty: string;
+  action?: React.ReactNode;
+  children: React.ReactNode[];
+}) {
   return (
     <section className="space-y-3">
       <h2 className="text-2xl text-ink">
         {title} <span className="font-sans text-base text-ink/70">({children.length})</span>
       </h2>
       {children.length === 0 ? (
-        <p className="rounded-md border border-dashed border-line p-4 text-sm text-ink/85">{empty}</p>
+        <div className="rounded-md border border-dashed border-line p-4 text-sm text-ink/85">
+          <p>{empty}</p>
+          {action}
+        </div>
       ) : (
         <ul className="sinapis-rise-group space-y-2">{children}</ul>
       )}
