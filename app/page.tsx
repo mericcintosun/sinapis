@@ -1,9 +1,21 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { OverviewBoard } from "@/components/overview-board";
 import { SceneSlot } from "@/components/scene-slot";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { seedKitchen } from "@/lib/data";
 
 export const metadata: Metadata = { title: "Overview" };
+
+// The DEMO.md walk as plain text links. Every href resolves to an existing route file:
+// app/page.tsx, app/dishes/[id]/page.tsx, app/activity/page.tsx, app/dishes/page.tsx.
+const TRY_STEPS = [
+  { href: "/#matrix", label: "Read the matrix below: 16 dishes by the 14 EU allergens." },
+  { href: "/dishes/grilled-sea-bass?allergen=MUS", label: "Click a cell, for example Grilled sea bass by Mustard, to see the path behind it." },
+  { href: "/activity#log-change", label: "Log the tahini change: Stone-ground tahini may now contain Peanuts. Preview, then Apply." },
+  { href: "/dishes", label: "Check a guest: pick Sesame and Celery on the Dishes page." },
+  { href: "/dishes/lamb-shish?allergen=PNT", label: "After Apply, open Lamb shish by Peanuts to see the path graph draw the chain." },
+];
 
 // Overview: the app shell's welcome state, built from the seed. No marketing hero;
 // the rail holds the only call to action (Log supplier change).
@@ -38,6 +50,29 @@ export default function OverviewPage() {
           />
         </div>
       </section>
+
+      <Card className="sinapis-rise">
+        <CardHeader>
+          <CardTitle>Try it in 90 seconds</CardTitle>
+          <CardDescription className="max-w-[68ch]">
+            Built for a chef running a small restaurant kitchen. Sinapis is decision support, not a medical guarantee.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ol className="list-decimal space-y-1 pl-5 text-sm">
+            {TRY_STEPS.map((s) => (
+              <li key={s.href}>
+                <Link
+                  href={s.href}
+                  className="inline-flex min-h-11 items-center underline decoration-kiln/25 underline-offset-4 hover:decoration-kiln"
+                >
+                  {s.label}
+                </Link>
+              </li>
+            ))}
+          </ol>
+        </CardContent>
+      </Card>
 
       <OverviewBoard />
     </div>
