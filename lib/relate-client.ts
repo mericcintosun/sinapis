@@ -9,6 +9,7 @@ import {
   RELATE_RETRIES,
   RELATE_TIMEOUT_MS,
   WORKER_INIT_TIMEOUT_MS,
+  WORKER_OPEN_MAX_MS,
 } from "@/lib/config";
 import { CoreError, errorCodeOf, isErrorCode, type ErrorCode } from "@/lib/errors";
 import type { Row } from "@/lib/relate";
@@ -91,12 +92,15 @@ function post(msg: Outgoing, timeoutMs: number): Promise<unknown> {
   });
 }
 
-/** Loads the module, opens opfs://sinapis-kitchen and seeds it once. Failure is sticky. */
+/**
+ * Loads the module, opens opfs://sinapis-kitchen and seeds it once. The open may take up to
+ * WORKER_OPEN_MAX_MS; only a real failure or that limit is sticky for the session.
+ */
 function ensureOpen(): Promise<void> {
   if (disabled) return Promise.reject(new CoreError(disabled, "Relate is not available in this browser session"));
   if (!opening) {
     const t0 = now();
-    opening = post({ op: "open" }, WORKER_INIT_TIMEOUT_MS).then(
+    opening = post({ op: "open" }, WORKER_OPEN_MAX_MS).then(
       () => {
         console.info(`${LOG_PREFIX} relate open ok ${Math.round(now() - t0)}ms`);
       },
@@ -113,9 +117,34 @@ function ensureOpen(): Promise<void> {
   return opening;
 }
 
+/**
+ * Waits for the open, but no longer than WORKER_INIT_TIMEOUT_MS or the call deadline. A step
+ * that runs out of time is answered by the mirror; the open keeps going for later steps.
+ */
+function openWithin(deadline: number): Promise<void> {
+  const open = ensureOpen();
+  const ms = Math.max(1, Math.min(WORKER_INIT_TIMEOUT_MS, Math.round(deadline - now())));
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new CoreError("upstream_timeout", "Relate is still opening")), ms);
+  });
+  return Promise.race([open, late]).finally(() => clearTimeout(timer));
+}
+
+/** Resolves true once Relate is open in this browser, false if it cannot open this session. */
+export async function relateReady(): Promise<boolean> {
+  if (!relateAvailable()) return false;
+  try {
+    await ensureOpen();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** One attempt. Its timeout is RELATE_TIMEOUT_MS, cut to what is left of the call budget. */
 async function once(msg: Outgoing, deadline: number): Promise<unknown> {
-  await ensureOpen();
+  await openWithin(deadline);
   const left = Math.max(1, Math.min(RELATE_TIMEOUT_MS, Math.round(deadline - now())));
   return post(msg, left);
 }
