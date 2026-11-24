@@ -1,8 +1,11 @@
 // Builds the persistent Relate store that judges can inspect.
 // 1. Reads data/kitchen.json (the same seed the browser loads).
-// 2. Writes kitchen/seed.cypher (one statement per line, diffable in git).
-// 3. If the `relate` CLI is on PATH, replays it into the ./kitchen directory store
-//    with the JSON codec. Idempotent: the store directory is rebuilt from scratch.
+// 2. Always writes kitchen/seed.cypher (one statement per line, diffable in git). The
+//    statements match seedStatements() in lib/relate.ts, in the same order.
+// 3. If the `relate` CLI is on PATH, replays the file into the ./kitchen/store directory
+//    store with JSON snapshots. Each candidate invocation below is tried in order with a
+//    fresh store directory, and the first one that exits 0 wins.
+// Deterministic: no clock, no randomness. Always exits 0 and says what happened.
 import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
@@ -24,16 +27,42 @@ const uses = (a, b) => `MATCH (a {id: ${q(a)}}), (b {id: ${q(b)}}) CREATE (a)-[:
 k.subRecipes.forEach((r) => r.uses.forEach((u) => out.push(uses(r.id, u))));
 k.dishes.forEach((d) => d.uses.forEach((u) => out.push(uses(d.id, u))));
 
+const SEED_FILE = "kitchen/seed.cypher";
+const STORE = "kitchen/store";
+const seedText = out.map((s) => s + ";").join("\n") + "\n";
+
 mkdirSync("kitchen", { recursive: true });
-writeFileSync("kitchen/seed.cypher", out.map((s) => s + ";").join("\n") + "\n");
-console.log(`seed: wrote kitchen/seed.cypher (${out.length} statements, ${k.dishes.length} dishes)`);
+writeFileSync(SEED_FILE, seedText);
+console.log(`seed: wrote ${SEED_FILE} (${out.length} statements, ${k.dishes.length} dishes)`);
 
 const probe = spawnSync("relate", ["--version"], { encoding: "utf8" });
-if (probe.status !== 0) {
-  console.log("seed: relate CLI not found, skipped building ./kitchen/store. Install Relate, then run npm run seed again.");
+if (probe.error || probe.status !== 0) {
+  console.log(`seed: store not built, the relate CLI is not on PATH (${probe.error ? probe.error.code : `exit ${probe.status}`}).`);
   process.exit(0);
 }
-// TODO: confirm the flag names against `relate --help` for the pinned CLI version.
-if (existsSync("kitchen/store")) rmSync("kitchen/store", { recursive: true });
-const run = spawnSync("relate", ["run", "--store", "kitchen/store", "--codec", "json", "--file", "kitchen/seed.cypher"], { stdio: "inherit" });
-process.exit(run.status ?? 1);
+
+// Flag names from the Relate docs: --database <dir> and --snapshot-format json.
+// The subcommand and the way the script is passed vary by CLI version, so try each.
+const DB = ["--database", STORE, "--snapshot-format", "json"];
+const candidates = [
+  { label: "relate run --database --snapshot-format json --file", args: ["run", ...DB, "--file", SEED_FILE] },
+  { label: "relate run --database --snapshot-format json <file>", args: ["run", ...DB, SEED_FILE] },
+  { label: "relate --database --snapshot-format json --file", args: [...DB, "--file", SEED_FILE] },
+  { label: "relate query --database --snapshot-format json --file", args: ["query", ...DB, "--file", SEED_FILE] },
+  { label: "relate --database --snapshot-format json < seed.cypher", args: [...DB], input: seedText },
+];
+
+const failed = [];
+for (const c of candidates) {
+  if (existsSync(STORE)) rmSync(STORE, { recursive: true });
+  const r = spawnSync("relate", c.args, { encoding: "utf8", input: c.input, timeout: 5_000 });
+  if (!r.error && r.status === 0 && existsSync(STORE)) {
+    console.log(`seed: built ${STORE} with "${c.label}"`);
+    process.exit(0);
+  }
+  failed.push(`${c.label}: ${r.error ? r.error.code : `exit ${r.status}`}`);
+}
+
+if (existsSync(STORE)) rmSync(STORE, { recursive: true });
+console.log(`seed: store not built, every relate invocation failed (${failed.join("; ")}).`);
+process.exit(0);
