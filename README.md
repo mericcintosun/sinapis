@@ -162,15 +162,15 @@ The browser path runs on Relate by default. To answer from the local mirror only
 <!-- PROOF:END tests -->
 - Relate engine:
 <!-- PROOF:BEGIN relate-engine -->
-`CYPHER.productImpact` for `p-tahini` on @relate/relate-wasm 1.2.0 in Node, in-memory store seeded with 187 statements, on 2026-11-24: 8 rows, 7 distinct dishes, 19.2 ms.
+`CYPHER.productImpact` for `p-tahini` on @relate/relate-wasm 1.2.0 in Node, in-memory store seeded with 187 statements, on 2026-11-24: 8 rows, 7 distinct dishes, 44.9 ms.
 <!-- PROOF:END relate-engine -->
 - Guest check on Relate (Sesame plus Celery):
 <!-- PROOF:BEGIN guest -->
-`CYPHER.guestSafeDishes` and `CYPHER.guestSwap` for Sesame plus Celery on @relate/relate-wasm 1.2.0 in Node, in-memory store seeded with 187 statements, on 2026-11-24: 3 safe dishes (cacik, grilled-sea-bass, zucchini-fritters), 3 safe with one swap (baba-ghanoush, fried-calamari, roast-cauliflower), roasted cauliflower with the garlic yogurt sauce swap: yes, 54.1 ms.
+`CYPHER.guestSafeDishes` and `CYPHER.guestSwap` for Sesame plus Celery on @relate/relate-wasm 1.2.0 in Node, in-memory store seeded with 187 statements, on 2026-11-24: 3 safe dishes (cacik, grilled-sea-bass, zucchini-fritters), 3 safe with one swap (baba-ghanoush, fried-calamari, roast-cauliflower), roasted cauliflower with the garlic yogurt sauce swap: yes, 119.4 ms.
 <!-- PROOF:END guest -->
 - Overview matrix on Relate:
 <!-- PROOF:BEGIN matrix -->
-`CYPHER.matrixDeclared` and `CYPHER.matrixUnknown` on @relate/relate-wasm 1.2.0 in Node, in-memory store seeded with 187 statements, on 2026-11-24: 16 dishes by 14 allergens, 34 contains, 8 may contain, 23 unknown, 159 clear cells, 7.6 ms.
+`CYPHER.matrixDeclared` and `CYPHER.matrixUnknown` on @relate/relate-wasm 1.2.0 in Node, in-memory store seeded with 187 statements, on 2026-11-24: 16 dishes by 14 allergens, 34 contains, 8 may contain, 23 unknown, 159 clear cells, 17.5 ms.
 <!-- PROOF:END matrix -->
 - Seed store:
 <!-- PROOF:BEGIN seed-store -->
