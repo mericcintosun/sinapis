@@ -15,8 +15,10 @@ npm run seed    # writes kitchen/seed.cypher, builds kitchen/store if the relate
 
 - Next.js 15 App Router. `params` and `searchParams` are Promises in pages, layouts and route handlers: await them.
 - Tailwind v4: there is no `tailwind.config`. Tokens live in the `@theme` block of `app/globals.css`, the only file allowed to hold hex colors (plus `lib/brand-colors.ts` for the OG image, which cannot read CSS variables).
-- Relate WASM rejects re-entrant calls. Keep the single promise queue in `lib/relate.ts`; never call the database outside it.
-- `opfs://` stores work only inside a dedicated worker.
+- Relate WASM rejects re-entrant calls. Keep the single promise queue in `lib/relate.worker.ts`; never call the database outside its `callDb`.
+- `opfs://` stores work only inside a dedicated worker. The page reaches it only through `lib/relate-client.ts`, imported only by `lib/adapter.real.ts`.
+- `lib/config.ts` is the only reader of `process.env` for app logic. `lib/adapter.ts` is the only module that branches on `ADAPTER_MODE`.
+- Tests: `npm test` (node:test through tsx, pure modules only). Proof: `npm run proof` rewrites the README proof blocks.
 - Relate Cypher uses `elementId()`, not `id()`. There is no APOC.
 - All data access goes through `lib/adapter.ts` (`getAdapter()`). `lib/data.ts` is the seed module; do not create a `lib/data/` directory, it would shadow `@/lib/data`.
 - Kit imports (`d3`, `motion/react`) live only in `"use client"` components. d3 does math only, never `d3.select`.

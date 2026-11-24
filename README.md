@@ -37,8 +37,8 @@ Relate is the engine that answers. If you remove the relationships, no cell in t
 | --- | --- | --- |
 | Why does this dish carry this allergen? | forward variable-length path, Dish to Allergen | `CYPHER.dishAllergenPaths` in `lib/relate.ts` |
 | Which dishes break if this product changes? | reverse traversal from one SupplierProduct | `CYPHER.productImpact` |
-| What becomes safe if one sauce is swapped? | path minus one node, re-evaluated | `guestCheck` in `lib/kitchen-graph.ts` (moves to Cypher next) |
-| Accept the supplier's change | write transaction: delete and merge one relationship | `commitSpecChange` |
+| What becomes safe if one sauce is swapped? | path minus one node, re-evaluated | `guestCheck` in `lib/kitchen-graph.ts`, still on the local mirror; the Cypher version is the next planned step |
+| Accept the supplier's change | delete and merge one relationship, then read back the reached dishes | `CYPHER.clearDeclaration`, `addContains` or `addMayContain`, then `productReach`, sent in one worker round by `applyChange` in `lib/adapter.real.ts` |
 
 ### Which Relate mode, and why
 
@@ -49,7 +49,7 @@ We use **two modes on purpose**:
 
 In-memory mode is not used for the store. It would leave nothing for a judge to inspect.
 
-All queries go through one promise queue in `lib/relate.ts`, because the WASM build rejects re-entrant calls. When `NEXT_PUBLIC_RELATE_WASM_URL` is not set, the UI falls back to `lib/kitchen-graph.ts`, a local mirror of the same patterns, and labels every answer with the engine that produced it.
+With `ADAPTER_MODE=real`, the browser starts one dedicated module worker (`lib/relate.worker.ts`) that loads `@relate/relate-wasm`, opens `opfs://sinapis-kitchen` and seeds it once from `data/kitchen.json` when it holds no `:Dish` node. Every query goes through one promise queue inside that worker, because the WASM build rejects re-entrant calls. The page talks to the worker through `lib/relate-client.ts`, with an 8 s timeout and exactly one retry per call. The dish path list, the impact preview and the write run on Relate. If the worker cannot load or does not answer, the same question is answered by `lib/kitchen-graph.ts`, a local mirror of the same patterns, and the note under the answer says "Sample data: answered by the local graph mirror, not by Relate." With the default `ADAPTER_MODE=fake`, everything answers from the mirror and says so. The matrix itself, the guest check and the API routes always answer from the mirror.
 
 ### Three queries to paste into `relate` against ./kitchen
 
@@ -67,15 +67,17 @@ MATCH (d:Dish)-[:USES*1..6]->(:Ingredient)-[:SUPPLIED_AS]->(sp:SupplierProduct {
 RETURN DISTINCT d.name AS dish, sp.name AS unknownProduct;
 ```
 
-To expose the same store to an agent over MCP, run `relate serve --mcp --store kitchen/store` (check the flag names against `relate --help` for your version).
+To expose the same store to an agent over MCP, run `relate serve --mcp --database kitchen/store` (check the subcommand against `relate --help` for your version).
 
 ## Tech stack
 
-- Next.js 15 (App Router), TypeScript strict, Tailwind CSS v4, shadcn-style primitives
-- Relate by Neo4j: `@relate/relate-wasm` in the browser, loaded from `NEXT_PUBLIC_RELATE_WASM_URL` when set (not bundled), `relate` CLI for the directory store
+- Next.js 15 (App Router), React 19, TypeScript strict, Tailwind CSS v4, shadcn-style primitives (Radix Slot, class-variance-authority, clsx, tailwind-merge, lucide-react)
+- Relate by Neo4j: `@relate/relate-wasm` in a dedicated browser worker with OPFS persistence, `relate` CLI for the directory store
 - Cypher 25 (variable-length paths)
 - d3 (scales and stacks only) and Motion for the allergen load chart
-- Vercel static deploy, no API keys
+- zod for input validation at the API edge
+- tsx and `node:test` for the tests
+- Vercel, no API keys, Relate runs in the browser; API routes answer from the local mirror
 
 ## Quickstart
 
@@ -83,9 +85,28 @@ To expose the same store to an agent over MCP, run `relate serve --mcp --store k
 npm install
 npm run dev          # http://localhost:3000, works with zero env vars
 npm run seed         # writes kitchen/seed.cypher and, if `relate` is on PATH, rebuilds kitchen/store
+npm test             # pinned kitchen facts and input schemas (node:test through tsx)
+npm run proof        # runs the tests, the seed and a Relate query, and rewrites the proof blocks below
 ```
 
-To run the browser path on Relate instead of the local mirror, copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_RELATE_WASM_URL` to the `@relate/relate-wasm` module URL. The recorded demo runs with this variable set. The engine label under each answer says `relate-wasm`.
+To run the browser path on Relate instead of the local mirror, copy `.env.example` to `.env.local` and set `ADAPTER_MODE=real`. The bundled `@relate/relate-wasm` package is used; `NEXT_PUBLIC_RELATE_WASM_URL` is only an optional override for loading the module from another URL. The note under each answer says "Live engine: Relate (WASM, stored in this browser with OPFS)." when Relate answered, and "Sample data: answered by the local graph mirror, not by Relate." when it did not.
+
+## Proof from the last build
+
+`npm run proof` writes these lines from what it actually ran. A line that starts with "Not run in this build" means the check could not run, and says why.
+
+- Tests:
+<!-- PROOF:BEGIN tests -->
+`npm test` on 2026-11-24: 14 passed, 0 failed, exit 0, 0.8 s.
+<!-- PROOF:END tests -->
+- Relate engine:
+<!-- PROOF:BEGIN relate-engine -->
+Not run in this build: no in-memory store opened (open(): Cannot read properties of undefined (reading '__wbindgen_malloc'); memory://: Cannot read properties of undefined (reading '__wbindgen_malloc'); :memory:: Cannot read properties of undefined ().
+<!-- PROOF:END relate-engine -->
+- Seed store:
+<!-- PROOF:BEGIN seed-store -->
+`node scripts/seed-store.mjs` on 2026-11-24: wrote kitchen/seed.cypher with 187 statements for 16 dishes. kitchen/store built: no (seed: store not built, the relate CLI is not on PATH (ENOENT).).
+<!-- PROOF:END seed-store -->
 
 ## Seed data
 
@@ -101,7 +122,7 @@ To run the browser path on Relate instead of the local mirror, copy `.env.exampl
 ## Declarations
 
 - **Relate capabilities used:** embedded WASM engine with OPFS persistence, directory store with the JSON codec, CLI, variable-length Cypher paths, write transactions.
-- **Third-party libraries:** Next.js, React, Tailwind CSS, d3, Motion, lucide-react, class-variance-authority, tailwind-merge, clsx, Radix Slot. All open source. No code written before 11 November 2026.
+- **Third-party libraries:** Next.js, React, Tailwind CSS, d3, Motion, zod, lucide-react, class-variance-authority, tailwind-merge, clsx, Radix Slot, and tsx for the tests. All open source. No code written before 11 November 2026.
 
 ## AI use
 

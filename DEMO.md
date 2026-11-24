@@ -19,10 +19,13 @@ Seed ids used below (checked against `data/kitchen.json`): dish `grilled-sea-bas
 3. **Supplier change form.** Click "Log supplier change" in the rail to reach `/activity#log-change` (file `app/activity/page.tsx`). Pick "Stone-ground tahini, 2 kg tin" (`p-tahini`), "Peanuts" (`PNT`), "May contain".
 4. **Preview, then Apply.** "Preview impact" lists the 7 reached dishes, each with its sauce path (for example Lamb shish > Tahini lemon sauce > Tahini > Stone-ground tahini). Click "Apply to the kitchen graph" (file `components/supplier-change-form.tsx`).
 5. **Cells turn red.** Back on `/` (file `app/page.tsx`), the Peanuts column now shows the 7 changed cells, ringed as fresh, and the chart re-stacks.
-6. **Guest check, then the store.** On `/dishes` (file `app/dishes/page.tsx`), pick Sesame and Celery. The safe list appears, plus "Roasted cauliflower: garlic yogurt sauce instead of tahini lemon sauce" under "Safe with one swap". Then, in a terminal, run query 2 from the README against `./kitchen`. **Stub until Phase 2:** the `kitchen/` store is not committed yet and the `relate` CLI flags in `scripts/seed-store.mjs` are unverified.
+6. **Guest check, then the store.** On `/dishes` (file `app/dishes/page.tsx`), pick Sesame and Celery. The safe list appears, plus "Roasted cauliflower: garlic yogurt sauce instead of tahini lemon sauce" under "Safe with one swap". Then, in a terminal, run query 2 from the README against the store built by `npm run seed` (`kitchen/store`, replayed from `kitchen/seed.cypher`). It lists the same 7 dishes the preview showed.
 
-## What runs where (Phase 1)
+## What runs where
 
-Every step runs on the local graph mirror (`lib/kitchen-graph.ts`) through the adapter in `lib/adapter.ts`, with `ADAPTER_MODE=fake`. Phase 2 makes Relate WASM answer the same calls.
+- Steps 2 to 5 (path click, preview, Apply, read-back) run on Relate WASM (`@relate/relate-wasm` in a dedicated browser worker, store `opfs://sinapis-kitchen`) when `ADAPTER_MODE=real`, and on the local graph mirror (`lib/kitchen-graph.ts`) when `ADAPTER_MODE=fake`. If the worker cannot load or times out in real mode, the mirror answers instead.
+- Every answer carries a note that says which engine produced it: "Live engine: Relate (WASM, stored in this browser with OPFS)." or "Sample data: answered by the local graph mirror, not by Relate."
+- The matrix on `/` is drawn from the mirror in both modes, by replaying the applied changes on the seed, so it renders in server HTML.
+- Step 6's guest check is still on the mirror. Query 2 runs in the `relate` CLI against `kitchen/store`.
 
 Sinapis is decision support, not a medical guarantee.
