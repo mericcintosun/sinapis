@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { DishPathsFromQuery, DishPathsSkeleton } from "@/components/dish-paths";
+import { SceneSlot } from "@/components/scene-slot";
 import { Button } from "@/components/ui/button";
 import { seedKitchen } from "@/lib/data";
 
@@ -30,22 +31,30 @@ export default async function DishPage({ params }: { params: Promise<{ id: strin
   });
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8">
+    <div className="mx-auto max-w-6xl space-y-8">
       <Button asChild variant="ghost" size="sm" className="-ml-2">
         <Link href="/dishes">
           <ArrowLeft aria-hidden />
           All dishes
         </Link>
       </Button>
-      <section className="sinapis-rise space-y-3">
-        <p className="text-sm font-semibold uppercase tracking-wide text-ink/75">
-          {dish.section} · {dish.localName} · {dish.price} TL
-        </p>
-        <h1 className="text-4xl text-ink md:text-5xl">{dish.name}</h1>
-        <p className="max-w-[66ch] text-lg leading-relaxed text-ink/90">
-          Built from {parts.join(", ")}. Each flag below shows the full chain the graph followed, down to the supplier
-          product whose spec sheet declared it.
-        </p>
+      <section className="sinapis-rise grid items-center gap-6 lg:grid-cols-[1.6fr_1fr]">
+        <div className="space-y-3">
+          <p className="text-sm font-semibold uppercase tracking-wide text-ink/90">
+            {dish.section} · {dish.localName} · {dish.price} TL
+          </p>
+          <h1 className="text-4xl text-ink md:text-5xl">{dish.name}</h1>
+          <p className="text-lg leading-relaxed text-ink">
+            Built from {parts.join(", ")}. Each flag below follows the chain down to the supplier product that declared it.
+          </p>
+        </div>
+        <div className="hidden overflow-hidden rounded-md sm:block">
+          <SceneSlot n={3}
+            alt="A tahini tin with a fresh supplier label taped on, next to an open email and three plates marked with red tags"
+            width={960}
+            height={600}
+          />
+        </div>
       </section>
       <Suspense fallback={<DishPathsSkeleton />}>
         <DishPathsFromQuery dishId={dish.id} />

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 520" width="480" height="520">
+  <rect width="480" height="520" fill="#963a28"/>
+  <rect y="300" width="480" height="220" fill="#1a1210"/>
+  <rect y="290" width="480" height="14" fill="#c96a55"/>
+  <ellipse cx="240" cy="392" rx="170" ry="62" fill="#fff4e6"/>
+  <ellipse cx="240" cy="388" rx="118" ry="38" fill="#c96a55"/>
+  <ellipse cx="240" cy="386" rx="102" ry="30" fill="#fff4e6"/>
+  <rect x="80" y="370" width="320" height="12" rx="6" fill="#84311f" transform="rotate(-12 240 376)"/>
+  <rect x="300" y="352" width="70" height="20" rx="8" fill="#84311f" transform="rotate(-12 335 362)"/>
+  <rect x="100" y="410" width="300" height="12" rx="6" fill="#a8432f" transform="rotate(8 250 416)"/>
+  <rect x="340" y="414" width="80" height="22" rx="6" fill="#a8432f" transform="rotate(8 380 425)"/>
+  <rect x="150" y="110" width="180" height="120" rx="6" fill="#fff4e6"/>
+  <rect x="172" y="134" width="90" height="14" rx="4" fill="#1a1210"/>
+  <rect x="172" y="164" width="136" height="10" rx="4" fill="#c96a55"/>
+  <rect x="172" y="188" width="110" height="10" rx="4" fill="#c96a55"/>
+</svg>

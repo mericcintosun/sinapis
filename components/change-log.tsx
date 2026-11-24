@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useKitchen } from "@/components/kitchen-provider";
 import { EmptyState } from "@/components/route-states";
+import { SceneSlot } from "@/components/scene-slot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,15 +12,24 @@ const KIND_WORD = { contains: "now contains", may: "may now contain", clear: "no
 
 function ChangeLogEmptyState() {
   return (
-    <EmptyState
-      title="No supplier changes logged yet"
-      hint="When a supplier emails a new declaration, enter it in the supplier change form and preview the dishes it reaches."
-      action={
-        <Button asChild size="sm" variant="quiet">
-          <Link href="/activity#log-change">Log a change</Link>
-        </Button>
-      }
-    />
+    <div className="grid items-center gap-4 sm:grid-cols-[1fr_12rem]">
+      <EmptyState
+        title="No supplier changes logged yet"
+        hint="Enter the next supplier email in the form above and preview the dishes it reaches before you apply it."
+        action={
+          <Button asChild size="sm" variant="quiet">
+            <Link href="/activity#log-change">Log a change</Link>
+          </Button>
+        }
+      />
+      <div className="mx-auto w-40 overflow-hidden rounded-md sm:w-full">
+        <SceneSlot n={5}
+          alt="An empty clipboard hanging on a hook above a clean plate, waiting for the next supplier note"
+          width={480}
+          height={480}
+        />
+      </div>
+    </div>
   );
 }
 

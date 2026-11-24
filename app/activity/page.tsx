@@ -7,27 +7,25 @@ export const metadata: Metadata = { title: "Change log" };
 
 export default function ActivityPage() {
   return (
-    <div className="mx-auto max-w-5xl space-y-8">
-      <section className="sinapis-rise grid items-center gap-6 lg:grid-cols-[1.4fr_1fr]">
-        <div className="space-y-3">
-          <h1 className="text-4xl text-ink md:text-5xl">Change log</h1>
-          <p className="max-w-[66ch] text-lg leading-relaxed text-ink/90">
-            Suppliers change recipes quietly. A new roasting line, a new grower, a new oven. Log the email here, see
-            exactly which dishes it touches, and only then write it to the graph.
-          </p>
-        </div>
-        <div className="overflow-hidden rounded-md">
-          <SceneSlot
-            n={3}
-            alt="A tahini tin with a fresh supplier label taped on, next to an open email and three plates marked with red tags"
-            width={960}
-            height={600}
+    <div className="sinapis-rise-group mx-auto max-w-6xl space-y-8">
+      <section className="sinapis-rise space-y-3">
+        <h1 className="text-4xl text-ink md:text-5xl">Change log</h1>
+        <p className="text-lg leading-relaxed text-ink">
+          Log the supplier&apos;s email, see every dish it reaches, and only then write it to the graph.
+        </p>
+      </section>
+      <div className="sinapis-rise grid items-start gap-6 lg:grid-cols-[1.7fr_1fr]">
+        <SupplierChangeForm />
+        <div className="hidden overflow-hidden rounded-md sm:block">
+          <SceneSlot n={4}
+            alt="A supplier's tahini tin and a jar on a steel shelf, a ladle resting across a cream spec sheet with one line marked"
+            width={720}
+            height={880}
           />
         </div>
-      </section>
-      <SupplierChangeForm />
-      <section className="space-y-4">
-        <h2 className="text-3xl text-ink">History</h2>
+      </div>
+      <section className="sinapis-rise space-y-4">
+        <h2 className="text-3xl text-ink md:text-4xl">History</h2>
         <ChangeLog />
       </section>
     </div>
