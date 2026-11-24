@@ -66,7 +66,7 @@ flowchart LR
   K --> CLI["relate CLI"]
 ```
 
-The matrix on `/` and the API routes under `app/api/` always answer from the mirror. The path list, the impact preview, the write and the guest check answer from Relate when `ADAPTER_MODE=real`.
+With the default `ADAPTER_MODE=real`, the matrix on `/`, the path list, the impact preview, the write and the guest check answer from Relate in the browser. The first server render of the matrix and the API routes under `app/api/` answer from the mirror, because no browser worker exists on the server.
 
 ## How it uses Relate
 
@@ -78,6 +78,7 @@ Relate is the engine that answers. If you remove the relationships, no cell in t
 | Which dishes break if this product changes? | reverse traversal from one SupplierProduct | `CYPHER.productImpact` |
 | Which dishes are safe for this guest? | no CONTAINS, MAY_CONTAIN or unknown-spec path to the guest's allergen codes | `CYPHER.guestSafeDishes`, asked by `guestCheck` in `lib/adapter.real.ts` |
 | What becomes safe if one sauce is swapped? | every offending path runs through one substitutable node, and the replacement reaches no offending product | `CYPHER.guestSwap` (the substitution list comes from `data/kitchen.json` as the `$swaps` parameter) |
+| What does the whole menu carry? | every Dish to Allergen declaration, plus every dish that reaches a product with no spec sheet | `CYPHER.matrixDeclared` and `CYPHER.matrixUnknown`, asked by `getMatrix` in `lib/adapter.real.ts` for the matrix on `/` |
 | Accept the supplier's change | delete and merge one relationship, then read back the reached dishes | `CYPHER.clearDeclaration`, `addContains` or `addMayContain`, then `productReach`, sent in one worker round by `applyChange` in `lib/adapter.real.ts` |
 
 ### Which Relate mode, and why
@@ -89,9 +90,9 @@ We use **two modes on purpose**:
 
 In-memory mode is not used for the store. It would leave nothing for a judge to inspect.
 
-With `ADAPTER_MODE=real`, the browser starts one dedicated module worker (`lib/relate.worker.ts`) that loads `@relate/relate-wasm`, runs its `init()`, opens `opfs://sinapis-kitchen` with `RelateDb.open` and seeds it from `data/kitchen.json` when the seed marker is missing. Every statement goes through `db.execute(query, paramsJson)` inside one promise queue, because the WASM build rejects re-entrant calls. If the worker cannot load or does not answer, the same question is answered by `lib/kitchen-graph.ts`, a local mirror of the same patterns.
+With `ADAPTER_MODE=real` (the default), the browser starts one dedicated module worker (`lib/relate.worker.ts`) that loads `@relate/relate-wasm`, runs its `init()`, opens `opfs://sinapis-kitchen` with `RelateDb.open` and seeds it from `data/kitchen.json` when the seed marker is missing. Every statement goes through `db.execute(query, paramsJson)` inside one promise queue, because the WASM build rejects re-entrant calls. If the worker cannot load or does not answer, the same question is answered by `lib/kitchen-graph.ts`, a local mirror of the same patterns.
 
-**What the live URL runs.** Every answer carries a note in the UI. "Live engine: Relate (WASM, stored in this browser with OPFS)." means Relate answered. "Sample data: answered by the local graph mirror, not by Relate." means the mirror answered, which is always the case for the overview matrix and is the case for every answer when the deployment runs with the default `ADAPTER_MODE=fake`.
+**What the live URL runs.** Every answer carries a note in the UI. "Live engine: Relate (WASM, stored in this browser with OPFS)." means Relate answered. "Asking Relate" shows on the matrix between the first paint (drawn from the seed replay) and Relate's answer. "Local mirror" means the mirror answered: in the default real mode only after the worker could not load or answer in this browser, and for every answer when a deployment sets `ADAPTER_MODE=fake`.
 
 Five-second rule: opening the worker (module download, OPFS open, first seed) has 3 s; one query attempt has 2 s, with exactly one retry, and the whole call is capped at 4.8 s. A worker that fails to open stays off for the session and every later question goes straight to the mirror.
 
@@ -149,7 +150,7 @@ npm run proof        # runs the tests, the seed and the Relate queries, and rewr
 npm run demo:reset   # rebuilds the seed (and kitchen/store if relate is on PATH), prints the reset URL and the walk
 ```
 
-To run the browser path on Relate instead of the local mirror, copy `.env.example` to `.env.local` and set `ADAPTER_MODE=real`.
+The browser path runs on Relate by default. To answer from the local mirror only (offline work, comparing answers), copy `.env.example` to `.env.local` and set `ADAPTER_MODE=fake`.
 
 ## Proof from the last build
 
@@ -157,16 +158,20 @@ To run the browser path on Relate instead of the local mirror, copy `.env.exampl
 
 - Tests:
 <!-- PROOF:BEGIN tests -->
-`npm test` on 2026-11-24: 17 passed, 0 failed, exit 0, 0.7 s.
+`npm test` on 2026-11-24: 17 passed, 0 failed, exit 0, 0.8 s.
 <!-- PROOF:END tests -->
 - Relate engine:
 <!-- PROOF:BEGIN relate-engine -->
-`CYPHER.productImpact` for `p-tahini` on @relate/relate-wasm 1.2.0 in Node, in-memory store seeded with 187 statements, on 2026-11-24: 8 rows, 7 distinct dishes, 14.3 ms.
+`CYPHER.productImpact` for `p-tahini` on @relate/relate-wasm 1.2.0 in Node, in-memory store seeded with 187 statements, on 2026-11-24: 8 rows, 7 distinct dishes, 15.3 ms.
 <!-- PROOF:END relate-engine -->
 - Guest check on Relate (Sesame plus Celery):
 <!-- PROOF:BEGIN guest -->
-`CYPHER.guestSafeDishes` and `CYPHER.guestSwap` for Sesame plus Celery on @relate/relate-wasm 1.2.0 in Node, in-memory store seeded with 187 statements, on 2026-11-24: 3 safe dishes (cacik, grilled-sea-bass, zucchini-fritters), 3 safe with one swap (baba-ghanoush, fried-calamari, roast-cauliflower), roasted cauliflower with the garlic yogurt sauce swap: yes, 27.6 ms.
+`CYPHER.guestSafeDishes` and `CYPHER.guestSwap` for Sesame plus Celery on @relate/relate-wasm 1.2.0 in Node, in-memory store seeded with 187 statements, on 2026-11-24: 3 safe dishes (cacik, grilled-sea-bass, zucchini-fritters), 3 safe with one swap (baba-ghanoush, fried-calamari, roast-cauliflower), roasted cauliflower with the garlic yogurt sauce swap: yes, 29.5 ms.
 <!-- PROOF:END guest -->
+- Overview matrix on Relate:
+<!-- PROOF:BEGIN matrix -->
+`CYPHER.matrixDeclared` and `CYPHER.matrixUnknown` on @relate/relate-wasm 1.2.0 in Node, in-memory store seeded with 187 statements, on 2026-11-24: 16 dishes by 14 allergens, 34 contains, 8 may contain, 23 unknown, 159 clear cells, 9.2 ms.
+<!-- PROOF:END matrix -->
 - Seed store:
 <!-- PROOF:BEGIN seed-store -->
 `node scripts/seed-store.mjs` on 2026-11-24: wrote kitchen/seed.cypher with 187 statements for 16 dishes. kitchen/store built: no (seed: store not built, the relate CLI is not on PATH (ENOENT).).

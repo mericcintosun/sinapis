@@ -24,9 +24,9 @@ Seed ids used below (checked against `data/kitchen.json`): dish `grilled-sea-bas
 
 ## What runs where
 
-- Steps 2 to 5 (path click, preview, Apply, read-back) and the step 6 guest check (`CYPHER.guestSafeDishes` and `CYPHER.guestSwap`) run on Relate WASM (`@relate/relate-wasm` in a dedicated browser worker, store `opfs://sinapis-kitchen`) when `ADAPTER_MODE=real`, and on the local graph mirror (`lib/kitchen-graph.ts`) when `ADAPTER_MODE=fake`. If the worker cannot load or times out in real mode, the mirror answers instead, in the same adapter function, inside 5 seconds.
-- Every answer carries a note that says which engine produced it: "Live engine: Relate (WASM, stored in this browser with OPFS)." or "Sample data: answered by the local graph mirror, not by Relate."
-- The matrix on `/` (step 1) is drawn from the mirror in both modes, by replaying the applied changes on the seed, so it renders in server HTML. Its note says so.
+- Steps 2 to 5 (path click, preview, Apply, read-back) and the step 6 guest check (`CYPHER.guestSafeDishes` and `CYPHER.guestSwap`) run on Relate WASM (`@relate/relate-wasm` in a dedicated browser worker, store `opfs://sinapis-kitchen`) when `ADAPTER_MODE=real` (the default, and what the live URL runs), and on the local graph mirror (`lib/kitchen-graph.ts`) when `ADAPTER_MODE=fake`. If the worker cannot load or times out in real mode, the mirror answers instead, in the same adapter function, inside 5 seconds.
+- Every answer carries a note that says which engine produced it: "Live engine: Relate (WASM, stored in this browser with OPFS)." or, after a fallback, "Local mirror" with one sentence saying Relate could not open in this browser.
+- The matrix on `/` (step 1) is first drawn from the mirror by replaying the applied changes on the seed, so it renders in server HTML (note: "Asking Relate"). In the browser, real mode then asks Relate (`CYPHER.matrixDeclared` and `CYPHER.matrixUnknown`) and draws its answer; the note switches to "Live engine". It is asked again after every Apply and reset.
 - Query 2 at the end of step 6 runs in the `relate` CLI against `kitchen/store`.
 - Step 7 draws the same paths the step 2 query returned (`getDishPaths` in `lib/adapter.real.ts`). The graph adds no query: d3 computes the layout and React renders it in the browser.
 

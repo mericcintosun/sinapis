@@ -83,8 +83,22 @@ None, no shell. The runner must verify: `npm install`, `npm run build` with zero
 ## Open questions
 
 - Which license should the repo carry? No LICENSE file exists, and the README says so.
-- Which `ADAPTER_MODE` does the Vercel project use? The README states both cases in the UI's words; set `ADAPTER_MODE=real` in Vercel before the walk if the live answers should come from Relate.
-- Carried from Phase 3: whether Relate accepts every guest-check construct, and whether a cold OPFS seed fits the 3 s init budget.
+- Resolved in QA round 1: `ADAPTER_MODE` now defaults to `real` in code. If the Vercel project still sets `ADAPTER_MODE=fake` as an env var, remove it, or the live answers stay on the mirror.
+- Carried from Phase 3: whether Relate accepts every guest-check construct. The cold OPFS seed no longer has to fit 3 s (see QA round 1).
+
+## QA round 1 (live crawl, 2026-11-24)
+
+| Finding | Root cause | Fix |
+| --- | --- | --- |
+| data: "Sample data" badge on `/` | the live build ran `ADAPTER_MODE=fake` (the old code default, `lib/config.ts` and `next.config.ts`), so every answer came from the mirror; and even in real mode the overview matrix was mirror-only by design (`matrixEngine: fakeAdapter.matrixEngine`) | default flipped to `real` (`lib/config.ts`, `next.config.ts`, `.env.example`); the overview matrix is now asked from Relate in the browser: `CYPHER.matrixDeclared` and `CYPHER.matrixUnknown` in `lib/relate.ts`, `rowsToMatrix`, `realAdapter.getMatrix` in `lib/adapter.real.ts`, re-asked after every Apply and reset in `components/kitchen-provider.tsx` |
+| data: "Sample data: answered by the local graph mirror, not by Relate." | same as above; plus a second cause waiting behind it: the worker open had a sticky 3 s timeout, and `relate_bg.wasm` is 7.2 MB, so a cold load would have switched Relate off for the whole session | `lib/relate-client.ts`: the open may take up to `WORKER_OPEN_MAX_MS` (30 s, `lib/config.ts`); a single step still gives up after 3 s and uses the mirror, but the open keeps going and later steps use Relate. `getMatrix` waits for the open (`relateReady()`), since the seed matrix is already on screen. Notes in `components/engine-note.tsx`: "Asking Relate" while waiting, "Live engine" when Relate answered, "Local mirror" with one calm sentence on a genuine fallback |
+| proof: `npm test` 17 passed | not a failure | none; added a `matrix` proof block (`scripts/proof.mjs`, README) that runs the two new matrix queries on Relate in Node |
+
+Unverified here (no shell): build, tests, and that the crawl sees "Live engine" on `/`. The parity check (`[core] parity ok` in the console) compares Relate's matrix with the mirror's cell by cell.
+
+## QA: external findings
+
+None. Both data findings had causes inside this repo.
 
 ## Next best step
 

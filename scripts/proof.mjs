@@ -8,6 +8,8 @@
 //                                       CYPHER.productImpact for p-tahini, rows and latency
 //   <!-- PROOF:BEGIN guest -->          CYPHER.guestSafeDishes and guestSwap for Sesame plus
 //                                       Celery on the same in-memory store (DEMO.md step 6)
+//   <!-- PROOF:BEGIN matrix -->         CYPHER.matrixDeclared and matrixUnknown, the overview
+//                                       matrix on the same store (DEMO.md step 1)
 //   <!-- PROOF:BEGIN seed-store -->     node scripts/seed-store.mjs, statement count, store built
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -157,6 +159,42 @@ async function proveGuest(engineLine) {
   }
 }
 
+// 5. Overview matrix (DEMO.md step 1) on the same in-memory store: the two queries the
+// browser runs for the matrix on `/`, counted by cell status with the app's rank rule.
+async function proveMatrix(engineLine) {
+  if (!seeded) {
+    const why = engineLine.startsWith("Not run in this build: ") ? engineLine.slice("Not run in this build: ".length) : "the engine proof did not seed a store.";
+    return `Not run in this build: ${why}`;
+  }
+  const declaredCypher = cypherOf("matrixDeclared");
+  const unknownCypher = cypherOf("matrixUnknown");
+  if (!declaredCypher || !unknownCypher) return "Not run in this build: CYPHER.matrixDeclared or CYPHER.matrixUnknown was not found in lib/relate.ts.";
+  const kitchen = JSON.parse(readFileSync("data/kitchen.json", "utf8"));
+  const codes = kitchen.allergens.map((a) => a.code);
+  const rank = { contains: 3, may: 2, unknown: 1, free: 0 };
+  const { db, version, statements } = seeded;
+  try {
+    const t0 = performance.now();
+    const declared = exec(db, declaredCypher);
+    const unknown = exec(db, unknownCypher);
+    const ms = (performance.now() - t0).toFixed(1);
+    const unknownDishes = new Set(unknown.map((r) => r?.dish));
+    const m = {};
+    for (const d of kitchen.dishes) m[d.id] = Object.fromEntries(codes.map((c) => [c, unknownDishes.has(d.id) ? "unknown" : "free"]));
+    for (const r of declared) {
+      const row = m[r?.dish];
+      if (!row || !(r.allergen in row)) continue;
+      const s = r.rel === "CONTAINS" ? "contains" : "may";
+      if (rank[s] > rank[row[r.allergen]]) row[r.allergen] = s;
+    }
+    const count = { contains: 0, may: 0, unknown: 0, free: 0 };
+    for (const row of Object.values(m)) for (const s of Object.values(row)) count[s]++;
+    return `\`CYPHER.matrixDeclared\` and \`CYPHER.matrixUnknown\` on @relate/relate-wasm ${version} in Node, in-memory store seeded with ${statements} statements, on ${today}: ${kitchen.dishes.length} dishes by ${codes.length} allergens, ${count.contains} contains, ${count.may} may contain, ${count.unknown} unknown, ${count.free} clear cells, ${ms} ms.`;
+  } catch (e) {
+    return `Not run in this build: the matrix queries failed in Node (${oneLine(e?.message ?? e)}).`;
+  }
+}
+
 function rewrite(readme, name, body) {
   const begin = `<!-- PROOF:BEGIN ${name} -->`;
   const end = `<!-- PROOF:END ${name} -->`;
@@ -182,8 +220,13 @@ async function main() {
   } catch (e) {
     results["guest"] = `Not run in this build: ${oneLine(e?.message ?? e)}.`;
   }
+  try {
+    results["matrix"] = await withTimeout(proveMatrix(results["relate-engine"]), 15_000, "the matrix proof");
+  } catch (e) {
+    results["matrix"] = `Not run in this build: ${oneLine(e?.message ?? e)}.`;
+  }
 
-  const blocks = ["tests", "relate-engine", "guest", "seed-store"];
+  const blocks = ["tests", "relate-engine", "guest", "matrix", "seed-store"];
   if (!existsSync(README)) {
     console.log("proof: README.md not found, nothing written");
   } else {
