@@ -269,8 +269,8 @@ export function PathGraph({
           <svg
             viewBox={`0 0 ${graph.width} ${graph.height}`}
             className="h-auto w-full max-w-full"
-            role="img"
-            aria-label={`Allergen path graph. ${summary}.`}
+            role="group"
+            aria-label={`Allergen path graph, ${plural(drawn.length, "path")} drawn. ${summary}.`}
           >
             <g key={drawKey}>
               {graph.links.map((l) => (
@@ -330,7 +330,7 @@ export function PathGraph({
         </div>
       </div>
       <figcaption className="space-y-1">
-        <p className="min-h-11 text-sm text-kiln" aria-live="polite">
+        <p className="min-h-11 rounded-md bg-kiln/5 px-3 py-2 text-sm font-medium text-kiln" aria-live="polite">
           {sentence}
         </p>
         <span className="sr-only">Paths drawn: {summary}.</span>
